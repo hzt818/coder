@@ -1,0 +1,95 @@
+//! File write tool
+
+use async_trait::async_trait;
+use super::*;
+
+pub struct FileWriteTool;
+
+#[async_trait]
+impl Tool for FileWriteTool {
+    fn name(&self) -> &str {
+        "file_write"
+    }
+
+    fn description(&self) -> &str {
+        "Write content to a file. Creates the file if it doesn't exist. Overwrites existing content."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Path to the file to write"
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Content to write to the file"
+                }
+            },
+            "required": ["path", "content"]
+        })
+    }
+
+    async fn execute(&self, args: serde_json::Value) -> ToolResult {
+        let path = args.get("path")
+            .and_then(|p| p.as_str())
+            .unwrap_or("");
+
+        if path.is_empty() {
+            return ToolResult::err("Path is required");
+        }
+
+        let content = args.get("content")
+            .and_then(|c| c.as_str())
+            .unwrap_or("");
+
+        // Ensure parent directory exists
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            if !parent.exists() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    return ToolResult::err(format!("Failed to create directory '{}': {}", parent.display(), e));
+                }
+            }
+        }
+
+        match std::fs::write(path, content) {
+            Ok(_) => ToolResult::ok(format!("Successfully wrote {} bytes to {}", content.len(), path)),
+            Err(e) => ToolResult::err(format!("Failed to write file '{}': {}", path, e)),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_file_write_tool_name() {
+        let tool = FileWriteTool;
+        assert_eq!(tool.name(), "file_write");
+    }
+
+    #[tokio::test]
+    async fn test_file_write_empty_path() {
+        let tool = FileWriteTool;
+        let result = tool.execute(serde_json::json!({"path": "", "content": "test"})).await;
+        assert!(!result.success);
+    }
+
+    #[tokio::test]
+    async fn test_file_write_success() {
+        let tool = FileWriteTool;
+        let tmp = tempfile::tempdir().unwrap();
+        let file_path = tmp.path().join("test.txt");
+        let path_str = file_path.to_str().unwrap();
+
+        let result = tool.execute(serde_json::json!({"path": path_str, "content": "hello world"})).await;
+        assert!(result.success);
+        assert!(result.output.contains("11 bytes"));
+
+        let content = std::fs::read_to_string(path_str).unwrap();
+        assert_eq!(content, "hello world");
+    }
+}

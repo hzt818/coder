@@ -49,6 +49,8 @@ libsql = "0.6"
 
 # OAuth
 oauth2 = "5.0"
+tiny_http = "0.12"
+open = "5"
 
 # Audio
 cpal = "0.15"
@@ -99,7 +101,7 @@ tui = []
 ai-openai = []
 ai-anthropic = []
 ai-google = []
-ai-opencode = []
+ai-opencode = ["oauth"]
 tools-core = []
 tools-git = []
 tools-docker = []

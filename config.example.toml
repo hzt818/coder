@@ -1,0 +1,47 @@
+# 🦀 Coder Configuration
+# Copy to ~/.coder/config.toml or ./coder.toml
+
+[ai]
+default_provider = "openai"
+
+[ai.provider.openai]
+type = "openai"
+api_key = "${OPENAI_API_KEY}"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o"
+
+[ai.provider.claude]
+type = "anthropic"
+api_key = "${ANTHROPIC_API_KEY}"
+model = "claude-sonnet-4-6"
+
+[ai.provider.deepseek]
+type = "openai"
+api_key = "${DEEPSEEK_API_KEY}"
+base_url = "https://api.deepseek.com/v1"
+model = "deepseek-chat"
+
+[ai.provider.gemini]
+type = "google"
+api_key = "${GEMINI_API_KEY}"
+model = "gemini-2.0-flash"
+
+[ai.provider.ollama]
+type = "openai"
+api_key = "ollama"
+base_url = "http://localhost:11434/v1"
+model = "llama3"
+
+[ui]
+theme = "coder-dark"
+show_line_numbers = true
+syntax_highlight = true
+mouse_support = true
+
+[tools]
+confirm_before_exec = false
+timeout_seconds = 300
+
+[session]
+auto_save_interval = 60
+max_messages_before_compact = 100
