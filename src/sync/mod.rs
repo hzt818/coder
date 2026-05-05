@@ -34,7 +34,7 @@ pub enum SyncError {
 }
 
 /// Sync direction
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SyncDirection {
     /// Upload local data to remote
     Upload,
@@ -45,7 +45,7 @@ pub enum SyncDirection {
 }
 
 /// Sync status of an item
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SyncStatus {
     /// Data is in sync
     Synced,
@@ -58,7 +58,7 @@ pub enum SyncStatus {
 }
 
 /// A syncable data item
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SyncItem {
     /// Unique identifier
     pub id: String,

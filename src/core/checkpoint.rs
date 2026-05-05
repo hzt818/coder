@@ -46,8 +46,11 @@ pub fn save_checkpoint(session: &Session, workspace: &str) -> anyhow::Result<()>
     });
 
     let path = dir.join("latest.json");
+    let tmp_path = dir.join("latest.json.tmp");
     let content = serde_json::to_string_pretty(&checkpoint)?;
-    std::fs::write(&path, content)?;
+    // Atomic write: write to tmp, then rename (prevents corruption on crash)
+    std::fs::write(&tmp_path, content)?;
+    std::fs::rename(&tmp_path, &path)?;
 
     tracing::debug!("Checkpoint saved to {}", path.display());
     Ok(())
@@ -145,7 +148,9 @@ pub fn queue_offline(content: &str) -> anyhow::Result<()> {
     });
 
     let content = serde_json::to_string_pretty(&queue)?;
-    std::fs::write(offline_queue_path(), content)?;
+    let tmp_path = offline_queue_path().with_extension("json.tmp");
+    std::fs::write(&tmp_path, content)?;
+    std::fs::rename(&tmp_path, offline_queue_path())?;
 
     tracing::debug!("Message queued offline ({} total in queue)", queue.len());
     Ok(())

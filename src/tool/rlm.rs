@@ -58,6 +58,10 @@ impl Tool for RlmTool {
 
         ToolResult::ok(result)
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

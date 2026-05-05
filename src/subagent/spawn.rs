@@ -137,15 +137,15 @@ mod tests {
         assert_eq!(config.system_prompt.unwrap(), "Be concise.");
     }
 
-    #[test]
-    fn test_subagent_handle_creation() {
-        let (tx, _rx) = tokio::sync::oneshot::channel();
+    #[tokio::test]
+    async fn test_subagent_handle_creation() {
+        let (tx, rx) = tokio::sync::oneshot::channel();
         let handle = tokio::spawn(async {
-            tx.send(()).unwrap();
+            let _ = tx.send(());
             Ok::<_, anyhow::Error>("done".to_string())
         });
-        // Just verify we can create a handle struct (not actually joining here
-        // since the test runtime may not support it in all configurations)
+        // Keep rx alive until after the spawn runs
+        let _rx = rx;
         let _subagent_handle = SubagentHandle {
             id: "test-1".to_string(),
             handle,

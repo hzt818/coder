@@ -2,8 +2,15 @@
 
 /// Get the coder config directory (~/.coder)
 pub fn coder_dir() -> std::path::PathBuf {
-    dirs::home_dir()
-        .expect("HOME directory not found")
+    // Try HOME first (Unix), then USERPROFILE (Windows), then APPDATA
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .or_else(|_| std::env::var("APPDATA"))
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            // Last resort fallback
+            std::path::PathBuf::from(".")
+        })
         .join(".coder")
 }
 

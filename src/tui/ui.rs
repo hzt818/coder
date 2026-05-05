@@ -31,6 +31,9 @@ pub async fn run_app(
     // Channel for receiving streaming events
     let (stream_tx, mut stream_rx) = tokio::sync::mpsc::channel::<AgentEvent>(256);
 
+    // Cancellation flag for streaming tasks
+    let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
     // Render throttling state
     let mut last_render = std::time::Instant::now();
     let mut _frame_count = 0u64;
@@ -68,7 +71,7 @@ pub async fn run_app(
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {}
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
                     app.mode = AppMode::Input;
-                    app.status = "Ready".to_string();
+                    app.status = "Stream ended".to_string();
                     app.mark_status_dirty();
                 }
             }
@@ -113,10 +116,24 @@ pub async fn run_app(
                                 let mut stream = app.agent.run_stream(&input).await;
                                 // Forward events from agent stream to our render stream
                                 let tx = stream_tx.clone();
+                                let cancel = cancel_flag.clone();
+                                cancel_flag.store(false, std::sync::atomic::Ordering::SeqCst);
                                 tokio::spawn(async move {
-                                    while let Some(event) = stream.recv().await {
-                                        if tx.send(event).await.is_err() {
+                                    loop {
+                                        if cancel.load(std::sync::atomic::Ordering::SeqCst) {
                                             break;
+                                        }
+                                        tokio::select! {
+                                            event = stream.recv() => {
+                                                match event {
+                                                    Some(event) => {
+                                                        if tx.send(event).await.is_err() {
+                                                            break;
+                                                        }
+                                                    }
+                                                    None => break,
+                                                }
+                                            }
                                         }
                                     }
                                 });
@@ -125,6 +142,7 @@ pub async fn run_app(
                             }
                         }
                         InputAction::Interrupt => {
+                            cancel_flag.store(true, std::sync::atomic::Ordering::SeqCst);
                             app.mode = AppMode::Input;
                             app.status = "Interrupted".to_string();
                             app.mark_status_dirty();
@@ -204,6 +222,7 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
         &app.messages,
         app.scroll_offset,
         &app.working_dir,
+        app.git_branch.as_deref(),
         theme,
     );
 
@@ -350,17 +369,8 @@ fn render_welcome(frame: &mut Frame, area: Rect, app: &App, theme: &AppTheme) {
         .alignment(Alignment::Center),
     );
 
-    // Git branch (if in a git repo)
-    let git_branch = std::process::Command::new("git")
-        .args(["-C", &app.working_dir, "branch", "--show-current"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if s.is_empty() { None } else { Some(s) }
-        });
-    if let Some(ref branch) = git_branch {
+    // Git branch (cached at startup, avoids per-frame git call)
+    if let Some(ref branch) = app.git_branch {
         lines.push(
             Line::from(vec![
                 Span::styled("branch: ", Style::default().fg(theme.dim)),

@@ -295,17 +295,21 @@ impl Agent {
                         match event {
                             StreamEvent::TextChunk(chunk) => {
                                 full_text.push_str(&chunk);
-                                let _ = tx.send(AgentEvent::TextChunk(chunk)).await;
+                                if tx.send(AgentEvent::TextChunk(chunk)).await.is_err() {
+                                    tracing::warn!("Agent event channel closed, stopping stream");
+                                    break;
+                                }
                             }
                             StreamEvent::ToolCallStart(tc) => {
                                 has_tool_call = true;
                                 tool_calls.push(tc.clone());
-                                let _ = tx
-                                    .send(AgentEvent::ToolCallStart {
-                                        id: tc.id,
-                                        name: tc.name,
-                                    })
-                                    .await;
+                                if tx.send(AgentEvent::ToolCallStart {
+                                    id: tc.id,
+                                    name: tc.name,
+                                }).await.is_err() {
+                                    tracing::warn!("Agent event channel closed, stopping stream");
+                                    break;
+                                }
                             }
                             StreamEvent::Done {
                                 stop_reason,
@@ -315,7 +319,10 @@ impl Agent {
                                 final_usage = usage;
                             }
                             StreamEvent::Error(e) => {
-                                let _ = tx.send(AgentEvent::Error(e)).await;
+                                if tx.send(AgentEvent::Error(e)).await.is_err() {
+                                    tracing::warn!("Agent event channel closed after error");
+                                    break;
+                                }
                             }
                             _ => {}
                         }
@@ -351,25 +358,26 @@ impl Agent {
                         let result = self.tools.execute(&tc.name, tc.arguments.clone()).await;
                         self.context
                             .add_message(Message::tool_result(&tc.id, &result.output));
-                        let _ = tx
-                            .send(AgentEvent::ToolResult {
-                                tool_name: tc.name.clone(),
-                                result,
-                            })
-                            .await;
+                        if tx.send(AgentEvent::ToolResult {
+                            tool_name: tc.name.clone(),
+                            result,
+                        }).await.is_err() {
+                            tracing::warn!("Agent event channel closed during tool result");
+                            break;
+                        }
                     }
-
-                    // Send Done event
-                    let _ = tx
-                        .send(AgentEvent::Done {
-                            stop_reason: final_stop_reason,
-                            usage: final_usage,
-                        })
-                        .await;
 
                     if !has_tool_call {
-                        break; // No tool calls, conversation turn complete
+                        // No tool calls — conversation turn is complete, send final Done
+                        if tx.send(AgentEvent::Done {
+                            stop_reason: final_stop_reason,
+                            usage: final_usage,
+                        }).await.is_err() {
+                            tracing::warn!("Agent event channel closed at loop end");
+                        }
+                        break;
                     }
+                    // has_tool_call → continue the ReAct loop with tool results fed back in
                 }
                 Err(e) => {
                     let _ = tx.send(AgentEvent::Error(e.to_string())).await;
@@ -392,7 +400,7 @@ pub enum AgentEvent {
     },
     /// Text content chunk
     TextChunk(String),
-    /// Reasoning/thinking content chunk
+    /// Reasoning/thinking content chunk (reserved for future use; not yet emitted by any provider)
     ReasoningChunk(String),
     /// Tool call started
     ToolCallStart {

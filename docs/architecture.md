@@ -684,22 +684,19 @@ pub struct ProviderConfig {
 
 ---
 
-## 9. 特征门控系统
+## 9. 特性门控系统
 
 ### 9.1 Cargo Features 结构
 
-三个阶段的功能，每个通过 Cargo feature 控制编译：
+两个阶段的功能，每个通过 Cargo feature 控制编译：
 
 ```
-# Phase 1 — 核心增强功能 (默认关闭)
+# Phase 1 — 核心协作功能（默认关闭）
 team, skill, subagent, memory, storage, lsp, mcp
 
 # Phase 2 — 高级功能
 server, permission, sync, voice, oauth, analytics, computer, worktree
-tools-docker, tools-db, tools-oauth, tools-computer
-
-# Phase 3 — 平台适配器
-adapters-telegram, adapters-feishu, adapters-slack
+tools-docker, tools-db, tools-oauth
 
 # AI 提供商
 ai-openai, ai-anthropic, ai-google, ai-opencode
@@ -707,16 +704,18 @@ ai-openai, ai-anthropic, ai-google, ai-opencode
 # 运行模式
 tui
 
-# 工具集
-tools-core, tools-git
+# 工具集（默认始终启用核心工具，Git 等可选）
+tools-git
 ```
 
 ### 9.2 默认特性
 
 ```toml
 [features]
-default = ["tui", "ai-openai", "ai-anthropic", "ai-opencode", "tools-core"]
+default = ["tui", "ai-openai", "ai-anthropic", "ai-opencode"]
 ```
+
+> **注意**：`tools-core` 不是特性门控——核心工具（Bash、File I/O、Web 等）始终编译。若需 Git/Docker/SQL 等增强工具，分别启用 `tools-git`、`tools-docker`、`tools-db`。
 
 ### 9.3 条件编译模式
 
@@ -738,7 +737,7 @@ pub mod server;
 
 ---
 
-## 10. Phase 1+ 扩展系统
+## 10. Phase 1 扩展系统
 
 ### 10.1 Team — 团队协作系统
 
@@ -819,7 +818,7 @@ MemoryStore (JSON 文件 → ~/.coder/memory/)
 
 ---
 
-## 11. Phase 2+ 功能架构
+## 11. Phase 2 功能架构
 
 ### 11.1 Permission — 权限系统
 
@@ -939,14 +938,14 @@ Git worktree 管理，支持创建、列出、删除隔离的工作目录。
 ### 13.1 构建命令
 
 ```bash
-# 默认构建 (TUI + OpenAI + Anthropic + 核心工具)
+# 默认构建 (TUI + OpenAI + Anthropic + OpenCode + 核心工具)
 cargo build
 
 # 完整构建 (所有功能)
-cargo build --features "tui,ai-openai,ai-anthropic,ai-google,tools-core,tools-git,tools-docker,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,computer,permission,worktree"
+cargo build --features "tui,ai-openai,ai-anthropic,ai-google,tools-git,tools-docker,tools-db,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,computer,permission,worktree"
 
 # 最小构建 (仅核心 + OpenAI)
-cargo build --no-default-features --features "ai-openai,tools-core"
+cargo build --no-default-features --features "ai-openai"
 
 # 发布构建 (LTO + 优化 + 符号剥离)
 cargo build --release

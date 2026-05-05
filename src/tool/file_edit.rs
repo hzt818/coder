@@ -73,6 +73,10 @@ impl Tool for FileEditTool {
             Err(e) => ToolResult::err(format!("Failed to write file '{}': {}", path, e)),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

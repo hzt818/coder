@@ -60,6 +60,8 @@ impl ChecklistStatus {
 
 /// Global checklist state (per-process, in-memory for now)
 static CHECKLIST: Mutex<ChecklistState> = Mutex::new(ChecklistState::new());
+/// Maximum checklist items to retain to prevent unbounded growth.
+const MAX_CHECKLIST_ITEMS: usize = 1000;
 
 struct ChecklistState {
     items: Vec<ChecklistItem>,
@@ -173,6 +175,11 @@ impl Tool for ChecklistTool {
                     state.next_id = current_id + 1;
                 }
 
+                // Prevent unbounded memory growth
+                while state.items.len() > MAX_CHECKLIST_ITEMS {
+                    state.items.remove(0);
+                }
+
                 let mut output = String::new();
                 if let Some(g) = &state.goal {
                     output.push_str(&format!("Goal: {}\n\n", g));
@@ -210,6 +217,11 @@ impl Tool for ChecklistTool {
                         details: None,
                     });
                     state.next_id = current_id + 1;
+                }
+
+                // Prevent unbounded memory growth
+                while state.items.len() > MAX_CHECKLIST_ITEMS {
+                    state.items.remove(0);
                 }
 
                 let mut output = String::new();

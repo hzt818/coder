@@ -69,7 +69,11 @@ impl AudioOutput {
         let channels = config.channels() as usize;
 
         let samples: Vec<f32> = samples.to_vec();
+        let total_samples = samples.len();
         let mut write_offset = 0;
+
+        // Compute duration before the closure captures samples
+        let duration_secs = total_samples as f32 / sample_rate as f32 / channels as f32;
 
         let stream = device
             .build_output_stream(
@@ -77,7 +81,7 @@ impl AudioOutput {
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     for sample in data.iter_mut() {
                         *sample = samples.get(write_offset).copied().unwrap_or(0.0);
-                        write_offset = (write_offset + 1) % samples.len().max(1);
+                        write_offset = (write_offset + 1) % total_samples.max(1);
                     }
                 },
                 err_fn,
@@ -90,7 +94,6 @@ impl AudioOutput {
             .map_err(|e| VoiceError::AudioOutput(format!("Failed to start output stream: {e}")))?;
 
         // Let playback run for the duration of the samples
-        let duration_secs = samples.len() as f32 / sample_rate as f32 / channels as f32;
         std::thread::sleep(std::time::Duration::from_secs_f32(duration_secs));
 
         drop(stream);

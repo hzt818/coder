@@ -93,7 +93,7 @@ impl Default for PolicySet {
     fn default() -> Self {
         Self {
             policies: Vec::new(),
-            default_level: PermissionLevel::Ask,
+            default_level: PermissionLevel::Deny,
         }
     }
 }
@@ -215,7 +215,7 @@ mod tests {
     fn test_policy_set_default() {
         let set = PolicySet::new();
         let action = Action::new("unknown");
-        assert_eq!(set.evaluate(&action).unwrap(), PermissionLevel::Ask);
+        assert_eq!(set.evaluate(&action).unwrap(), PermissionLevel::Deny);
     }
 
     #[test]

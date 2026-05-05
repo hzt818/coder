@@ -32,29 +32,35 @@ impl Screenshotter {
     ///
     /// Returns an RGBA image of the screen contents.
     pub fn capture_primary_display(&self) -> ComputerResult<RgbaImage> {
-        let screens = screenshots::Screen::all()
-            .map_err(|e| ComputerError::Screenshot(format!("Failed to list screens: {e}")))?;
-
+        let screens = screenshots::Screen::all();
         let primary = screens
             .first()
             .ok_or_else(|| ComputerError::DisplayNotFound("No displays found".to_string()))?;
 
-        self.capture_display(*primary.id())
+        self.capture_screen(primary)
     }
 
     /// Capture a specific display by its ID
     pub fn capture_display(&self, display_id: u32) -> ComputerResult<RgbaImage> {
-        let screen = screenshots::Screen::from_id(display_id)
-            .map_err(|e| ComputerError::Screenshot(format!("Failed to get display {display_id}: {e}")))?;
+        let screens = screenshots::Screen::all();
+        let screen = screens
+            .into_iter()
+            .find(|s| s.id == display_id)
+            .ok_or_else(|| ComputerError::Screenshot(format!("Display {display_id} not found")))?;
 
+        self.capture_screen(&screen)
+    }
+
+    /// Internal helper: capture a screen reference into an RgbaImage
+    fn capture_screen(&self, screen: &screenshots::Screen) -> ComputerResult<RgbaImage> {
         let image_data = screen
             .capture()
-            .map_err(|e| ComputerError::Screenshot(format!("Capture failed: {e}")))?;
+            .ok_or_else(|| ComputerError::Screenshot("Capture returned no data".to_string()))?;
 
         let rgba = RgbaImage::from_raw(
             image_data.width(),
             image_data.height(),
-            image_data.bytes().to_vec(),
+            image_data.buffer().clone(),
         )
         .ok_or_else(|| ComputerError::Screenshot("Failed to create image buffer".to_string()))?;
 
@@ -75,28 +81,21 @@ impl Screenshotter {
 
     /// Get the resolution of the primary display
     pub fn primary_display_resolution(&self) -> ComputerResult<Resolution> {
-        let screens = screenshots::Screen::all()
-            .map_err(|e| ComputerError::Screenshot(format!("Failed to list screens: {e}")))?;
-
+        let screens = screenshots::Screen::all();
         let primary = screens
             .first()
             .ok_or_else(|| ComputerError::DisplayNotFound("No displays found".to_string()))?;
 
-        Ok(Resolution::new(primary.display_info().width, primary.display_info().height))
+        Ok(Resolution::new(primary.width, primary.height))
     }
 
     /// List all available display IDs and their resolutions
     pub fn list_displays(&self) -> ComputerResult<Vec<(u32, Resolution)>> {
-        let screens = screenshots::Screen::all()
-            .map_err(|e| ComputerError::Screenshot(format!("Failed to list screens: {e}")))?;
+        let screens = screenshots::Screen::all();
 
         Ok(screens
             .iter()
-            .map(|s| {
-                let id = *s.id();
-                let info = s.display_info();
-                (id, Resolution::new(info.width, info.height))
-            })
+            .map(|s| (s.id, Resolution::new(s.width, s.height)))
             .collect())
     }
 }

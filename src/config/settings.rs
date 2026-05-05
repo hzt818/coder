@@ -65,8 +65,24 @@ impl Settings {
         Ok(settings)
     }
 
+    /// Check for unknown config keys that may indicate typos
+    fn check_unknown_keys(&self) {
+        for (name, provider) in &self.ai.providers {
+            if !provider.extra.is_empty() {
+                let keys: Vec<&String> = provider.extra.keys().collect();
+                tracing::warn!(
+                    "Provider '{}' has unknown config keys: {:?}. These may be typos or misspellings. \
+                     Supported keys: provider_type, api_key, base_url, model, api_version, \
+                     max_tokens, temperature, top_p, request_template, response_parser",
+                    name, keys
+                );
+            }
+        }
+    }
+
     /// Resolve `${VAR_NAME}` patterns in string fields using environment variables.
     fn resolve_env_vars(&mut self) {
+        self.check_unknown_keys();
         for (_name, provider) in self.ai.providers.iter_mut() {
             if let Some(key) = &provider.api_key {
                 provider.api_key = Some(Self::resolve_env(key));
@@ -80,7 +96,16 @@ impl Settings {
     fn resolve_env(value: &str) -> String {
         if value.starts_with("${") && value.ends_with('}') {
             let var_name = &value[2..value.len() - 1];
-            std::env::var(var_name).unwrap_or_else(|_| value.to_string())
+            match std::env::var(var_name) {
+                Ok(v) => v,
+                Err(_) => {
+                    tracing::warn!(
+                        "Environment variable '{}' is not set (referenced as '{}'). The API key will be empty.",
+                        var_name, value
+                    );
+                    String::new()
+                }
+            }
         } else {
             value.to_string()
         }

@@ -203,6 +203,10 @@ impl Tool for AutomationTool {
             )),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

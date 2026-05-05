@@ -78,7 +78,15 @@ impl Tool for QuestionTool {
 
         // In TUI mode, the TUI will set the answer via set_answer()
         // Fall back to stdin for headless/print modes
+        // Guard against infinite loop: max 300 retries = ~60 seconds
+        let mut retries = 0u32;
+        const MAX_RETRIES: u32 = 300;
         let answer = loop {
+            if retries >= MAX_RETRIES {
+                break "TIMEOUT: No user input received".to_string();
+            }
+            retries += 1;
+
             if let Ok(mut guard) = LAST_ANSWER.lock() {
                 if let Some(ans) = guard.take() {
                     break ans;
@@ -87,14 +95,22 @@ impl Tool for QuestionTool {
 
             // Try reading from stdin as fallback
             let mut input = String::new();
-            if std::io::stdin().read_line(&mut input).is_ok() {
-                let input = input.trim().to_string();
-                if !input.is_empty() {
-                    break input;
+            match std::io::stdin().read_line(&mut input) {
+                Ok(0) => {
+                    // EOF (stdin closed) — break with empty to avoid busy-loop
+                    break String::new();
+                }
+                Ok(_) => {
+                    let trimmed = input.trim().to_string();
+                    if !trimmed.is_empty() {
+                        break trimmed;
+                    }
+                }
+                Err(_) => {
+                    // stdin error — keep waiting
                 }
             }
 
-            std::thread::yield_now();
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         };
 

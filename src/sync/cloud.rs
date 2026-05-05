@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::{SyncDirection, SyncError, SyncItem, SyncResult, SyncStatus};
+use super::{SyncError, SyncItem, SyncResult, SyncStatus};
 
 /// Cloud synchronization client
 ///

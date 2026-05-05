@@ -36,7 +36,7 @@ impl PrAttemptState {
     }
 
     fn timestamp() -> String {
-        "2026-05-05T00:00:00Z".to_string()
+        chrono::Utc::now().to_rfc3339()
     }
 }
 
@@ -112,6 +112,12 @@ impl Tool for PrAttemptTool {
 
                 let mut state = PR_ATTEMPTS.lock().unwrap();
                 let id = state.next_id;
+                // Prevent unbounded memory growth
+                const MAX_PR_ATTEMPTS: usize = 500;
+                while state.items.len() >= MAX_PR_ATTEMPTS {
+                    state.items.remove(0);
+                }
+
                 state.next_id += 1;
 
                 let now = PrAttemptState::timestamp();
@@ -231,6 +237,10 @@ impl Tool for PrAttemptTool {
                 operation
             )),
         }
+    }
+
+    fn requires_permission(&self) -> bool {
+        true
     }
 }
 

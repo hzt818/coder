@@ -76,6 +76,75 @@ impl Message {
     }
 }
 
+/// Convert internal messages to OpenAI-compatible API format.
+/// Preserves tool_calls on assistant messages and tool_call_id on tool results.
+pub(crate) fn messages_to_openai(messages: &[Message]) -> Vec<serde_json::Value> {
+    messages
+        .iter()
+        .map(|msg| {
+            let role = msg.role.to_string();
+
+            match msg.role {
+                Role::Assistant => {
+                    let text = msg.text();
+                    let tool_calls: Vec<serde_json::Value> = msg.content.iter()
+                        .filter_map(|block| match block {
+                            ContentBlock::ToolUse { id, name, input } => {
+                                Some(serde_json::json!({
+                                    "id": id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": name,
+                                        "arguments": input.to_string(),
+                                    }
+                                }))
+                            }
+                            _ => None,
+                        })
+                        .collect();
+
+                    let mut json_msg = serde_json::json!({
+                        "role": role,
+                        "content": if text.is_empty() && !tool_calls.is_empty() { serde_json::Value::Null } else { serde_json::json!(text) },
+                    });
+
+                    if !tool_calls.is_empty() {
+                        json_msg["tool_calls"] = serde_json::json!(tool_calls);
+                    }
+
+                    json_msg
+                }
+                Role::Tool => {
+                    let tool_content: String = msg.content.iter()
+                        .filter_map(|block| match block {
+                            ContentBlock::ToolResult { content, .. } => Some(content.clone()),
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    let mut json_msg = serde_json::json!({
+                        "role": "tool",
+                        "content": tool_content,
+                    });
+
+                    if let Some(tcid) = &msg.tool_call_id {
+                        json_msg["tool_call_id"] = serde_json::json!(tcid);
+                    }
+
+                    json_msg
+                }
+                _ => {
+                    serde_json::json!({
+                        "role": role,
+                        "content": msg.text(),
+                    })
+                }
+            }
+        })
+        .collect()
+}
+
 /// Content block types (text, tool_use, tool_result)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]

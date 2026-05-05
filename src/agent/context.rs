@@ -1,7 +1,7 @@
 //! Context management for agent conversations
 
 use crate::ai::Message;
-use crate::core::compaction::{self, CompactionConfig, CompactionResult};
+use crate::core::compaction::{self, build_summary, CompactionConfig, CompactionResult};
 
 /// Manages the conversation context window
 #[derive(Debug, Clone)]
@@ -19,11 +19,16 @@ pub struct Context {
 impl Context {
     /// Create a new empty context
     pub fn new(max_tokens: u64) -> Self {
+        // Set compaction threshold at 80% of max tokens to trigger before hitting the limit
+        let token_threshold = (max_tokens as f64 * 0.8) as usize;
         Self {
             messages: Vec::new(),
             max_tokens,
             system_prompt: None,
-            compaction_config: CompactionConfig::default(),
+            compaction_config: CompactionConfig {
+                token_threshold,
+                ..CompactionConfig::default()
+            },
         }
     }
 
@@ -47,8 +52,22 @@ impl Context {
         &self.messages
     }
 
-    /// Get messages for the API call (system prompt + messages)
-    pub fn build_request(&self) -> Vec<Message> {
+    /// Get messages for the API call (system prompt + messages).
+    /// Automatically compacts if token budget is exceeded.
+    pub fn build_request(&mut self) -> Vec<Message> {
+        // Check if compaction is needed before building
+        if self.should_compact() {
+            tracing::info!("Context token budget exceeded, triggering compaction");
+            if let Some(result) = self.compact() {
+                tracing::info!(
+                    "Context compacted: {} → {} messages, {:.1}% reduction",
+                    result.original_messages,
+                    result.compacted_messages,
+                    result.reduction_pct()
+                );
+            }
+        }
+
         let mut result = Vec::new();
 
         // Add system prompt as first message if present
@@ -81,17 +100,15 @@ impl Context {
     pub fn compact(&mut self) -> Option<CompactionResult> {
         let result = compaction::compact_messages(&self.messages, &self.compaction_config);
         if result.summary_added {
-            // Replace messages with compacted version
             let keep_count = self.compaction_config.keep_recent.min(self.messages.len());
             let split_at = self.messages.len().saturating_sub(keep_count);
+
+            // Remove older messages and replace with a summary (single source of truth)
+            let older = &self.messages[..split_at];
+            let summary = build_summary(older);
             self.messages.drain(..split_at);
-            // The summary was already prepended by compact_messages
-            // We need to insert the summary message
-            self.messages.insert(0, Message::system(format!(
-                "[Prior context: {} messages compacted, ~{:.1}% reduction]",
-                result.original_messages,
-                result.reduction_pct()
-            )));
+            self.messages.insert(0, summary);
+
             Some(result)
         } else {
             None

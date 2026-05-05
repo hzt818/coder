@@ -112,10 +112,6 @@ impl SnapshotManager {
         let _ = git_args(&["config", "user.email", "snapshot@coder.local"]);
         let _ = git_args(&["config", "core.autocrlf", "false"]);
 
-        // Create a gitignore for the side repo
-        let mut ignore_file = self.snapshots_root.join(".gitignore");
-        ignore_file.push("gitignore"); // won't exist for side repo, that's fine
-
         // Add everything and make initial commit
         let _add_output = git_args(&["add", "-A", "--ignore-errors"]);
         let _ = git_args(&[
@@ -311,13 +307,20 @@ impl SnapshotManager {
     /// Ensure the side git repo is initialized
     fn ensure_initialized(&self) {
         if !self.git_dir.exists() {
-            if let Err(e) = std::process::Command::new("git")
+            match std::process::Command::new("git")
                 .arg("init")
                 .arg("--bare")
                 .arg(&self.git_dir)
                 .output()
             {
-                tracing::warn!("Failed to initialize side git: {}", e);
+                Ok(output) if !output.status.success() => {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    tracing::warn!("Side git init failed: {}", stderr);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to run git init: {}. Is git installed?", e);
+                }
+                _ => {}
             }
         }
     }
@@ -344,12 +347,15 @@ pub fn format_snapshot_list(snapshots: &[Snapshot]) -> String {
 
     let mut result = format!("── Snapshots ({}) ──\n\n", snapshots.len());
     for (i, snap) in snapshots.iter().enumerate() {
+        let id_safe = &snap.id[..snap.id.floor_char_boundary(12.min(snap.id.len()))];
+        let ts_end = 19.min(snap.timestamp.len());
+        let ts_safe = &snap.timestamp[..snap.timestamp.floor_char_boundary(ts_end)];
         result.push_str(&format!(
             "  {}. [{}] {} ({})\n",
             i + 1,
-            &snap.id[..snap.id.len().min(12)],
+            id_safe,
             snap.label,
-            snap.timestamp[..19].replace('T', " "),
+            ts_safe.replace('T', " "),
         ));
     }
     result.push_str("\nUse /restore <id> to restore a snapshot.");

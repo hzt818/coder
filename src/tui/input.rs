@@ -139,10 +139,10 @@ fn build_hint_line<'a>(app: &App, mode_text: &'a str, theme: &AppTheme, width: u
     // Prefix spacing
     spans.push(Span::styled("  ", Style::default()));
 
-    // Vim mode indicator in input mode
+    // Vim mode indicator (distinct from AppMode::Normal to avoid confusion)
     if matches!(app.mode, super::app::AppMode::Input) && !app.vim_state.is_insert() {
         spans.push(Span::styled(
-            "NORMAL",
+            "VIM",
             Style::default()
                 .fg(theme.warning)
                 .add_modifier(Modifier::BOLD),

@@ -118,6 +118,10 @@ impl Tool for GitHubTool {
             )),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 /// Run a gh CLI command and return stdout
@@ -398,6 +402,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires test environment without git remote"]
     fn test_resolve_repo_empty() {
         // Without git remote, this should fail gracefully
         let result = resolve_repo("");

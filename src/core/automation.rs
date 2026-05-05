@@ -4,8 +4,26 @@
 
 use std::sync::Mutex;
 
-#[allow(dead_code)]
 static AUTOMATION_MANAGER: Mutex<Option<AutomationManager>> = Mutex::new(None);
+
+/// Initialize the global AutomationManager. Call once at startup.
+pub fn init_automation_manager() {
+    let mut guard = AUTOMATION_MANAGER.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(AutomationManager::new());
+        tracing::info!("AutomationManager initialized");
+    }
+}
+
+/// Access the global AutomationManager (returns `None` if not initialized).
+pub fn with_automation<F, R>(f: F) -> Option<R>
+where
+    F: FnOnce(&mut AutomationManager) -> R,
+{
+    let mut guard = AUTOMATION_MANAGER.lock().ok()?;
+    let mgr = guard.as_mut()?;
+    Some(f(mgr))
+}
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AutomationStatus {

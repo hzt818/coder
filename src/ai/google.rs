@@ -41,38 +41,48 @@ impl Provider for GoogleProvider {
     async fn chat_stream(
         &self,
         messages: &[Message],
-        _tools: &[ToolDef],
+        tools: &[ToolDef],
         _config: &GenerateConfig,
     ) -> anyhow::Result<StreamHandler> {
         let (tx, rx) = tokio::sync::mpsc::channel(256);
 
         // Convert messages to Gemini format
-        // Gemini uses "user" and "model" roles (not "assistant")
         let contents: Vec<serde_json::Value> = messages
             .iter()
             .filter(|m| m.role != crate::ai::Role::System)
             .map(|m| {
-                let role = match m.role {
-                    crate::ai::Role::Assistant => "model",
-                    _ => "user",
+                let (role, parts) = match m.role {
+                    crate::ai::Role::Assistant => ("model", assistant_parts(m)),
+                    crate::ai::Role::Tool => ("function", tool_result_parts(m)),
+                    _ => ("user", text_parts(m)),
                 };
-                serde_json::json!({
-                    "role": role,
-                    "parts": [{"text": m.text()}]
-                })
+                serde_json::json!({ "role": role, "parts": parts })
             })
             .collect();
 
-        let body = serde_json::json!({
-            "contents": contents
+        let mut body = serde_json::json!({
+            "contents": contents,
         });
+
+        // Add tool definitions if provided (Gemini function calling)
+        if !tools.is_empty() {
+            body["tools"] = serde_json::json!(tools.iter().map(|t| {
+                serde_json::json!({
+                    "functionDeclarations": [{
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.input_schema,
+                    }]
+                })
+            }).collect::<Vec<_>>());
+        }
 
         let url = format!(
             "https://generativelanguage.googleapis.com/v1/models/{}:streamGenerateContent?alt=sse&key={}",
             self.model, self.api_key
         );
 
-        let client = reqwest::Client::new();
+        let client = crate::ai::build_http_client();
         let response = client
             .post(&url)
             .header("Content-Type", "application/json")
@@ -97,6 +107,53 @@ impl Provider for GoogleProvider {
     }
 }
 
+/// Build text-only parts for user/system messages
+fn text_parts(msg: &Message) -> Vec<serde_json::Value> {
+    msg.content.iter().filter_map(|block| match block {
+        ContentBlock::Text { text } => {
+            Some(serde_json::json!({ "text": text }))
+        }
+        _ => None,
+    }).collect()
+}
+
+/// Build parts for assistant messages, preserving functionCall blocks
+fn assistant_parts(msg: &Message) -> Vec<serde_json::Value> {
+    msg.content.iter().map(|block| match block {
+        ContentBlock::Text { text } => {
+            serde_json::json!({ "text": text })
+        }
+        ContentBlock::ToolUse { name, input, .. } => {
+            serde_json::json!({
+                "functionCall": {
+                    "name": name,
+                    "args": input,
+                }
+            })
+        }
+        _ => serde_json::Value::Null,
+    }).filter(|v| !v.is_null()).collect()
+}
+
+/// Build parts for tool result messages (functionResponse in Gemini)
+fn tool_result_parts(msg: &Message) -> Vec<serde_json::Value> {
+    msg.content.iter().filter_map(|block| match block {
+        ContentBlock::ToolResult { tool_use_id, content } => {
+            // Gemini uses the function name, not tool_use_id; extract from adjacent ToolUse
+            // Fallback: use tool_use_id as name
+            Some(serde_json::json!({
+                "functionResponse": {
+                    "name": tool_use_id,
+                    "response": {
+                        "content": content,
+                    }
+                }
+            }))
+        }
+        _ => None,
+    }).collect()
+}
+
 /// Parse a Gemini SSE stream.
 ///
 /// Each SSE event has a `data:` line with a JSON object.
@@ -116,10 +173,9 @@ async fn parse_gemini_sse(
         // Process all complete SSE events in the buffer
         loop {
             let (event_content, event_len) = {
-                let s = match std::str::from_utf8(&buf) {
-                    Ok(s) => s,
-                    Err(_) => break,
-                };
+                // Use lossy conversion to avoid dropping data on invalid UTF-8
+                let s = String::from_utf8_lossy(&buf);
+                let s: &str = &s;
 
                 // Handle both \r\n\r\n and \n\n event separators
                 if let Some(pos) = s.find("\r\n\r\n") {
@@ -216,7 +272,7 @@ async fn process_gemini_data(
         }
     }
 
-    // Extract text from content parts
+    // Extract text and function calls from content parts
     let content = match first_candidate.get("content") {
         Some(c) => c,
         None => return,
@@ -228,10 +284,24 @@ async fn process_gemini_data(
     };
 
     for part in parts {
+        // Text content
         if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
             if !text.is_empty() {
                 let _ = tx.send(StreamEvent::TextChunk(text.to_string())).await;
             }
+        }
+        // Function call (tool use)
+        if let Some(fc) = part.get("functionCall") {
+            let name = fc.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
+            let args = fc.get("args").cloned().unwrap_or(serde_json::json!({}));
+            let id = format!("fc_{}", name);
+            let _ = tx.send(StreamEvent::ToolCallStart(
+                crate::ai::ToolCall {
+                    id,
+                    name: name.to_string(),
+                    arguments: args,
+                }
+            )).await;
         }
     }
 }

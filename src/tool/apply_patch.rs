@@ -89,15 +89,31 @@ impl Tool for ApplyPatchTool {
             return ToolResult::err("No valid hunks found in patch");
         }
 
-        // Apply each hunk
+        // Apply each hunk, tracking line offset as hunks shift content
         let mut result_content = content.clone();
         let mut applied = 0;
         let mut fuzz_used = 0;
+        let mut line_offset: isize = 0;
         let mut errors: Vec<String> = Vec::new();
 
         for hunk in &hunks {
-            match apply_hunk(&result_content, hunk, fuzz) {
+            // Adjust the hunk's search position based on previous hunks' line shifts
+            let adjusted_start = (hunk.orig_start as isize + line_offset).max(1) as usize;
+            let adjusted_hunk = Hunk {
+                orig_start: adjusted_start,
+                orig_lines: hunk.orig_lines,
+                new_start: hunk.new_start,
+                new_lines: hunk.new_lines,
+                lines: hunk.lines.clone(),
+            };
+
+            let old_line_count = result_content.lines().count();
+
+            match apply_hunk(&result_content, &adjusted_hunk, fuzz) {
                 Ok((new_content, fuzz_level)) => {
+                    let new_line_count = new_content.lines().count();
+                    // Track how line positions shifted after this hunk
+                    line_offset += new_line_count as isize - old_line_count as isize;
                     result_content = new_content;
                     applied += 1;
                     fuzz_used = fuzz_used.max(fuzz_level);
@@ -139,6 +155,10 @@ impl Tool for ApplyPatchTool {
             }
             Err(e) => ToolResult::err(format!("Failed to write file '{}': {}", path, e)),
         }
+    }
+
+    fn requires_permission(&self) -> bool {
+        true
     }
 }
 

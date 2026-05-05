@@ -73,7 +73,6 @@ impl SkillRegistry {
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Box<dyn Skill>)> {
         self.skills.iter().map(|(k, v)| (k.as_str(), v))
     }
-}
 
     /// Discover skills from a directory path (scans for SKILL.md files)
     pub fn discover_from(path: &Path) -> Vec<String> {

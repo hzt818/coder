@@ -3,7 +3,7 @@
 //! Supports multi-path discovery from project directories,
 //! user directories, and community registry.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use super::registry::SkillRegistry;
 
 /// Configuration for loading a skill

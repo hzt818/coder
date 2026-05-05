@@ -53,11 +53,17 @@ impl Tool for DbQueryTool {
             Err(e) => ToolResult::err(format!("Query failed: {}", e)),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 async fn execute_query(db_path: &str, query: &str) -> Result<String, String> {
     // Open the database
-    let db = libsql::Database::open(db_path)
+    let db = libsql::Builder::new_local(db_path)
+        .build()
+        .await
         .map_err(|e| format!("Failed to open database '{}': {}", db_path, e))?;
 
     let conn = db.connect()

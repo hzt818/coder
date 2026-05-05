@@ -73,6 +73,8 @@ pub struct App {
     /// Input history
     pub input_history: Vec<String>,
     pub history_position: Option<usize>,
+    /// Saved input buffer when navigating history (restored when going past end)
+    pub saved_input: String,
     /// Token usage
     pub total_input_tokens: u64,
     pub total_output_tokens: u64,
@@ -97,6 +99,8 @@ pub struct App {
     mention_all_candidates: Vec<String>,
     /// Vim modal editing state
     pub vim_state: VimState,
+    /// Cached git branch name (computed once at construction)
+    pub git_branch: Option<String>,
 }
 
 /// A message rendered in the chat panel
@@ -124,6 +128,7 @@ impl App {
         working_dir: String,
     ) -> Self {
         let mention_all_candidates = Self::build_mention_candidates(&agent);
+        let git_branch = Self::detect_git_branch(&working_dir);
         Self {
             mode: AppMode::Input,
             input: String::new(),
@@ -137,6 +142,7 @@ impl App {
             scroll_offset: 0,
             input_history: Vec::new(),
             history_position: None,
+            saved_input: String::new(),
             total_input_tokens: 0,
             total_output_tokens: 0,
             total_cost: 0.0,
@@ -151,7 +157,21 @@ impl App {
             cached_status_dirty: std::cell::Cell::new(true),
             mention_all_candidates,
             vim_state: VimState::new(),
+            git_branch,
         }
+    }
+
+    /// Detect git branch once at startup (cached for performance).
+    fn detect_git_branch(workdir: &str) -> Option<String> {
+        std::process::Command::new("git")
+            .args(["-C", workdir, "branch", "--show-current"])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .and_then(|o| {
+                let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if s.is_empty() { None } else { Some(s) }
+            })
     }
 
     /// Detect the type of command from the input
@@ -397,9 +417,12 @@ impl App {
             Some(extracted_query) => {
                 let candidates = self.mention_candidates(&extracted_query);
                 if let InputSubmode::Mention { ref mut query, ref mut items, ref mut selected } = self.input_submode {
-                    *query = extracted_query;
-                    *items = candidates;
-                    *selected = 0;
+                    // Only reset selection if the query actually changed (new filter results)
+                    if *query != extracted_query {
+                        *query = extracted_query;
+                        *items = candidates;
+                        *selected = 0;
+                    }
                 }
             }
             None => {
@@ -534,7 +557,17 @@ impl App {
                 if args.is_empty() {
                     (true, Some("Usage: /commit <message>".to_string()))
                 } else {
-                    let result = self.execute_shell(&format!("git commit -m \"{}\"", args.replace('"', "\\\"")));
+                    // Use temp file to avoid shell injection from message content
+                    use std::io::Write;
+                    let result = match std::fs::File::create("_commit_msg.tmp") {
+                        Ok(mut f) => {
+                            let _ = writeln!(f, "{}", args);
+                            let out = self.execute_shell("git commit -F _commit_msg.tmp");
+                            let _ = std::fs::remove_file("_commit_msg.tmp");
+                            out
+                        }
+                        Err(e) => format!("Failed to create commit message file: {}", e),
+                    };
                     (true, Some(result))
                 }
             }
@@ -574,6 +607,7 @@ impl App {
             // ── Action commands ──
             "clear" | "c" => {
                 self.messages.clear();
+                self.scroll_offset = 0;
                 (true, Some("Conversation cleared.".to_string()))
             }
             "compact" => {
@@ -859,6 +893,9 @@ impl App {
             }
         }
 
+        // Clamp scroll offset to new message bounds
+        self.clamp_scroll();
+
         // Persist session after every message
         self.auto_save();
         self.mark_status_dirty();
@@ -932,8 +969,7 @@ impl App {
                 self.status = format!("Reasoning effort: {}", effort.display_name());
             }
             AgentEvent::CostEstimate { estimate } => {
-                self.total_input_tokens += estimate.input_tokens;
-                self.total_output_tokens += estimate.output_tokens;
+                // CostEstimate is informational; actual tokens are counted from Done event
                 self.total_cost += estimate.total_cost;
                 self.session_cost += estimate.total_cost;
             }
@@ -951,6 +987,8 @@ impl App {
                     timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
                     tool_calls: Vec::new(),
                 });
+                // Persist the compacted state
+                self.auto_save();
             }
             AgentEvent::Error(e) => {
                 self.status = format!("Error: {}", e);
@@ -963,6 +1001,8 @@ impl App {
                 });
             }
         }
+        // Keep scroll offset within valid range after message changes
+        self.clamp_scroll();
         self.mark_status_dirty();
     }
 
@@ -975,9 +1015,28 @@ impl App {
 
     // ── Navigation ──
 
+    /// Estimate the maximum scroll offset for the current messages.
+    /// Each message contributes header + content lines + tool call lines + spacing.
+    fn max_scroll(&self) -> usize {
+        let line_count: usize = self.messages.iter().map(|msg| {
+            let content_lines = msg.content.lines().count();
+            let tool_lines: usize = msg.tool_calls.iter().map(|tc| tc.output.lines().count() + 2).sum();
+            3 + content_lines + tool_lines // header + content + tools
+        }).sum();
+        line_count.saturating_sub(10) // subtract ~10 for visible area
+    }
+
+    // Clamp the scroll offset so it doesn't exceed the current message bounds
+    fn clamp_scroll(&mut self) {
+        self.scroll_offset = self.scroll_offset.min(self.max_scroll());
+    }
+
     /// Scroll chat up
     pub fn scroll_up(&mut self) {
-        self.scroll_offset = self.scroll_offset.saturating_add(1);
+        let max = self.max_scroll();
+        if self.scroll_offset < max {
+            self.scroll_offset += 1;
+        }
         self.mark_status_dirty();
     }
 
@@ -987,18 +1046,25 @@ impl App {
         self.mark_status_dirty();
     }
 
-    /// Toggle detail panel
+    /// Toggle detail panel (clears cached content to ensure fresh computation)
     pub fn toggle_detail(&mut self) {
         self.show_detail = !self.show_detail;
+        if self.show_detail {
+            self.detail_content.clear();
+        }
     }
 
-    /// Navigate input history back
+    /// Navigate input history back (saves current unsent input first)
     pub fn history_back(&mut self) {
         if self.input_history.is_empty() {
             return;
         }
         let pos = self.history_position.unwrap_or(self.input_history.len());
         if pos > 0 {
+            // Save current unsent input when first entering history navigation
+            if self.history_position.is_none() {
+                self.saved_input = self.input.clone();
+            }
             let new_pos = pos - 1;
             self.input = self.input_history[new_pos].clone();
             self.cursor_pos = self.input.len();
@@ -1006,7 +1072,7 @@ impl App {
         }
     }
 
-    /// Navigate input history forward
+    /// Navigate input history forward (restores saved input at end)
     pub fn history_forward(&mut self) {
         if let Some(pos) = self.history_position {
             if pos + 1 < self.input_history.len() {
@@ -1014,8 +1080,9 @@ impl App {
                 self.cursor_pos = self.input.len();
                 self.history_position = Some(pos + 1);
             } else {
-                self.input.clear();
-                self.cursor_pos = 0;
+                // Restore the saved unsent input
+                self.input = std::mem::take(&mut self.saved_input);
+                self.cursor_pos = self.input.len();
                 self.history_position = None;
             }
         }

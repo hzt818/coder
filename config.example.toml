@@ -4,29 +4,29 @@
 [ai]
 default_provider = "openai"
 
-[ai.provider.openai]
+[ai.providers.openai]
 type = "openai"
 api_key = "${OPENAI_API_KEY}"
 base_url = "https://api.openai.com/v1"
 model = "gpt-4o"
 
-[ai.provider.claude]
+[ai.providers.claude]
 type = "anthropic"
 api_key = "${ANTHROPIC_API_KEY}"
 model = "claude-sonnet-4-6"
 
-[ai.provider.deepseek]
+[ai.providers.deepseek]
 type = "openai"
 api_key = "${DEEPSEEK_API_KEY}"
 base_url = "https://api.deepseek.com/v1"
 model = "deepseek-chat"
 
-[ai.provider.gemini]
+[ai.providers.gemini]
 type = "google"
 api_key = "${GEMINI_API_KEY}"
 model = "gemini-2.0-flash"
 
-[ai.provider.ollama]
+[ai.providers.ollama]
 type = "openai"
 api_key = "ollama"
 base_url = "http://localhost:11434/v1"

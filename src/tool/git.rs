@@ -73,6 +73,10 @@ impl Tool for GitTool {
             _ => ToolResult::err(format!("Unknown git operation: '{}'. Use: status, diff, log, commit, push, blame, branch, show", operation)),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 /// Run a git command and return the output
@@ -82,6 +86,7 @@ async fn run_git_command(repo_path: &str, args: &[&str]) -> Result<String, Strin
     let output = Command::new("git")
         .args(args)
         .current_dir(repo_path)
+        .env("LC_ALL", "C")
         .output()
         .await
         .map_err(|e| format!("Failed to execute git command: {}", e))?;
@@ -199,20 +204,23 @@ async fn git_commit(repo_path: &str, args: &serde_json::Map<String, serde_json::
         .unwrap_or(false);
 
     if all {
-        if let Err(e) = run_git_command(repo_path, &["add", "-A"]).await {
-            return ToolResult::err(format!("Failed to stage files: {}", e));
+        // Stage tracked files with modifications (-u), avoids staging untracked files
+        if let Err(e) = run_git_command(repo_path, &["add", "-u"]).await {
+            return ToolResult::err(format!("Failed to stage changes: {}", e));
         }
+    }
+
+    // Check porcelain before committing to avoid fragile error-message parsing
+    match run_git_command(repo_path, &["status", "--porcelain"]).await {
+        Ok(porcelain) if porcelain.trim().is_empty() => {
+            return ToolResult::ok("Nothing to commit. Working tree is clean.");
+        }
+        _ => {} // has changes — proceed
     }
 
     match run_git_command(repo_path, &["commit", "-m", message]).await {
         Ok(o) => ToolResult::ok(format!("Commit successful:\n{}", o)),
-        Err(e) => {
-            if e.contains("nothing to commit") || e.contains("no changes added") {
-                ToolResult::ok("Nothing to commit. Working tree is clean.")
-            } else {
-                ToolResult::err(format!("Commit failed: {}", e))
-            }
-        }
+        Err(e) => ToolResult::err(format!("Commit failed: {}", e)),
     }
 }
 

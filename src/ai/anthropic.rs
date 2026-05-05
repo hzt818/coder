@@ -85,8 +85,10 @@ impl Provider for AnthropicProvider {
     }
 
     fn supports_thinking(&self) -> bool {
+        // Claude 4.x+ models (Sonnet 4.6, Opus 4.6, Haiku 4.5) all support extended thinking
         self.model.contains("claude-sonnet")
             || self.model.contains("claude-opus")
+            || self.model.contains("claude-haiku")
     }
 
     async fn chat_stream(
@@ -97,7 +99,7 @@ impl Provider for AnthropicProvider {
     ) -> anyhow::Result<StreamHandler> {
         let (tx, rx) = tokio::sync::mpsc::channel(256);
 
-        let client = reqwest::Client::new();
+        let client = crate::ai::build_http_client();
         let request_body = self.build_request(messages, tools, config);
 
         let mut request = client
@@ -293,18 +295,58 @@ fn messages_to_anthropic(messages: &[&Message]) -> Vec<serde_json::Value> {
     messages
         .iter()
         .map(|msg| {
-            let role = match msg.role {
-                crate::ai::Role::Assistant => "assistant",
-                crate::ai::Role::Tool => "user", // tool_result goes as user in Anthropic
-                _ => "user",
-            };
+            match msg.role {
+                crate::ai::Role::Assistant => {
+                    // Build content array preserving text + tool_use blocks
+                    let content: Vec<serde_json::Value> = msg.content.iter().map(|block| {
+                        match block {
+                            ContentBlock::Text { text } => {
+                                serde_json::json!({"type": "text", "text": text})
+                            }
+                            ContentBlock::ToolUse { id, name, input } => {
+                                serde_json::json!({
+                                    "type": "tool_use",
+                                    "id": id,
+                                    "name": name,
+                                    "input": input,
+                                })
+                            }
+                            _ => serde_json::Value::Null,
+                        }
+                    }).filter(|v| !v.is_null()).collect();
 
-            let json_msg = serde_json::json!({
-                "role": role,
-                "content": msg.text(),
-            });
+                    serde_json::json!({
+                        "role": "assistant",
+                        "content": content,
+                    })
+                }
+                crate::ai::Role::Tool => {
+                    // Tool result: wrap in tool_result content blocks (Anthropic format)
+                    let content: Vec<serde_json::Value> = msg.content.iter().map(|block| {
+                        match block {
+                            ContentBlock::ToolResult { tool_use_id, content } => {
+                                serde_json::json!({
+                                    "type": "tool_result",
+                                    "tool_use_id": tool_use_id,
+                                    "content": content,
+                                })
+                            }
+                            _ => serde_json::Value::Null,
+                        }
+                    }).filter(|v| !v.is_null()).collect();
 
-            json_msg
+                    serde_json::json!({
+                        "role": "user",
+                        "content": content,
+                    })
+                }
+                _ => {
+                    serde_json::json!({
+                        "role": "user",
+                        "content": msg.text(),
+                    })
+                }
+            }
         })
         .collect()
 }

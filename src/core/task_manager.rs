@@ -105,11 +105,14 @@ impl TaskManager {
         Vec::new()
     }
 
-    /// Save tasks to disk
+    /// Save tasks to disk (atomic write via tmp + rename)
     fn save_to_disk(&self) {
         let idx_path = self.tasks_dir.join("tasks.json");
+        let tmp_path = self.tasks_dir.join("tasks.json.tmp");
         if let Ok(content) = serde_json::to_string_pretty(&self.tasks) {
-            let _ = std::fs::write(&idx_path, content);
+            if std::fs::write(&tmp_path, content).is_ok() {
+                let _ = std::fs::rename(&tmp_path, &idx_path);
+            }
         }
     }
 
@@ -181,14 +184,16 @@ impl TaskManager {
 
     /// Delete all completed/failed/canceled tasks
     pub fn clear_completed(&mut self) {
-        self.tasks.retain(|t| !t.status.as_str().is_empty() && t.status == "queued" || t.status == "running");
+        self.tasks.retain(|t| t.status == "queued" || t.status == "running");
         self.save_to_disk();
     }
 
     /// Record a task event
-    fn record_event(&self, task_id: &str, event_type: &str, payload: Option<String>) {
+    fn record_event(&mut self, task_id: &str, event_type: &str, payload: Option<String>) {
+        let event_id = self.next_event_id;
+        self.next_event_id += 1;
         let event = TaskEvent {
-            id: self.next_event_id,
+            id: event_id,
             task_id: task_id.to_string(),
             event_type: event_type.to_string(),
             payload,

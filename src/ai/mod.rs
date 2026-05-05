@@ -18,6 +18,15 @@ pub mod opencode;
 pub use provider::Provider;
 pub use types::*;
 
+/// Create a shared reqwest::Client for AI API calls.
+/// Connection timeout is set; no overall timeout to allow streaming responses.
+pub fn build_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(15))
+        .build()
+        .expect("Failed to build HTTP client")
+}
+
 /// Create a provider instance from configuration.
 pub fn create_provider(
     _name: &str,

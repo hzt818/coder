@@ -34,7 +34,7 @@ impl OpenAIProvider {
     fn build_request(&self, messages: &[Message], tools: &[ToolDef], config: &GenerateConfig) -> serde_json::Value {
         let mut body = serde_json::json!({
             "model": self.model,
-            "messages": messages_to_openai(messages),
+            "messages": crate::ai::types::messages_to_openai(messages),
             "max_tokens": config.max_tokens,
             "temperature": config.temperature,
             "stream": true,
@@ -48,11 +48,7 @@ impl OpenAIProvider {
             }
         }
 
-        // Add thinking budget if specified
-        if let Some(budget) = config.thinking_budget {
-            body["thinking_budget"] = serde_json::json!(budget);
-        }
-
+        // thinking_budget is Anthropic-only; NOT sent to OpenAI-compatible APIs
         if !tools.is_empty() {
             body["tools"] = serde_json::json!(tools.iter().map(|t| {
                 serde_json::json!({
@@ -88,7 +84,7 @@ impl Provider for OpenAIProvider {
     ) -> anyhow::Result<StreamHandler> {
         let (tx, rx) = tokio::sync::mpsc::channel(256);
 
-        let client = reqwest::Client::new();
+        let client = crate::ai::build_http_client();
         let request_body = self.build_request(messages, tools, config);
 
         let request = client
@@ -268,24 +264,4 @@ pub async fn process_sse_data(
                 .await;
         }
     }
-}
-
-/// Convert internal messages to OpenAI format
-fn messages_to_openai(messages: &[Message]) -> Vec<serde_json::Value> {
-    messages
-        .iter()
-        .map(|msg| {
-            let role = msg.role.to_string();
-            let mut json_msg = serde_json::json!({
-                "role": role,
-                "content": msg.text(),
-            });
-
-            if let Some(tcid) = &msg.tool_call_id {
-                json_msg["tool_call_id"] = serde_json::json!(tcid);
-            }
-
-            json_msg
-        })
-        .collect()
 }

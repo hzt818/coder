@@ -72,6 +72,22 @@ impl Tool for BashTool {
             .unwrap_or(".")
             .to_string();
 
+        // Route through sandbox backend if configured
+        if let Some(ref sandbox) = self.sandbox_backend {
+            let result = sandbox.execute(&command, &workdir, timeout).await;
+            let mut output = format!("$ {}\n\n{}", command, result.stdout);
+            if !result.stderr.is_empty() {
+                output.push_str(&format!("\nSTDERR:\n{}", result.stderr));
+            }
+            if result.timed_out {
+                output.push_str(&format!("\nCommand timed out after {}s", timeout));
+            }
+            if result.exit_code != 0 {
+                output.push_str(&format!("\nExit code: {}", result.exit_code));
+            }
+            return ToolResult::ok(output);
+        }
+
         match execute_command(&command, &workdir, timeout, self.max_output_bytes).await {
             Ok(output) => ToolResult::ok(output),
             Err(e) => ToolResult::err(format!("Command failed: {}", e)),
@@ -120,28 +136,27 @@ async fn execute_command(
         let chunk = String::from_utf8_lossy(&output.stdout);
         if result.len() + chunk.len() > max_output_bytes {
             let remaining = max_output_bytes.saturating_sub(result.len());
-            result.push_str(&chunk[..remaining]);
+            let safe_end = chunk.floor_char_boundary(remaining);
+            result.push_str(&chunk[..safe_end]);
             truncated = true;
         } else {
             result.push_str(&chunk);
         }
     }
 
-    // Process stderr with label
+    // Process stderr with label (always include, even if stdout was truncated)
     if !output.stderr.is_empty() {
-        if !result.is_empty() && !truncated {
-            result.push('\n');
-        }
-        if !truncated {
-            result.push_str("STDERR:\n");
-            let chunk = String::from_utf8_lossy(&output.stderr);
-            if result.len() + chunk.len() > max_output_bytes {
-                let remaining = max_output_bytes.saturating_sub(result.len());
-                result.push_str(&chunk[..remaining]);
-                truncated = true;
-            } else {
-                result.push_str(&chunk);
-            }
+        let needs_sep = !result.is_empty();
+        result.push_str("STDERR:\n");
+        let chunk = String::from_utf8_lossy(&output.stderr);
+        if result.len() + chunk.len() > max_output_bytes {
+            let remaining = max_output_bytes.saturating_sub(result.len());
+            let safe_end = chunk.floor_char_boundary(remaining);
+            if needs_sep { result.push('\n'); }
+            result.push_str(&chunk[..safe_end]);
+            truncated = true;
+        } else {
+            result.push_str(&chunk);
         }
     }
 

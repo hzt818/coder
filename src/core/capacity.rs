@@ -86,9 +86,10 @@ pub fn truncate_output(output: &str, max_bytes: usize, max_tokens: usize, tool_n
         return output.to_string();
     }
 
-    // Calculate how many bytes to keep
+    // Calculate how many bytes to keep (safe UTF-8 boundary)
     let keep_bytes = max_bytes.min(original_size);
-    let truncated = &output[..keep_bytes];
+    let safe_boundary = output.floor_char_boundary(keep_bytes);
+    let truncated = &output[..safe_boundary];
 
     let mut result = String::new();
     result.push_str(&format!(
@@ -101,12 +102,12 @@ pub fn truncate_output(output: &str, max_bytes: usize, max_tokens: usize, tool_n
         estimated_tokens,
         original_size,
         max_tokens.min(estimated_tokens),
-        keep_bytes,
+        safe_boundary,
     ));
     result.push_str(truncated);
 
     // Indicate truncation at end
-    if keep_bytes < original_size {
+    if safe_boundary < original_size {
         result.push_str(&format!(
             "\n\n─── Output truncated ({}/{} bytes shown) ───",
             keep_bytes, original_size

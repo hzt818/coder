@@ -93,6 +93,10 @@ impl Tool for CiTool {
             Err(e) => ToolResult::err(e),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 /// Get the GitHub token from environment

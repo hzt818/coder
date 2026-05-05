@@ -58,8 +58,9 @@ impl Tool for WebSearchTool {
 /// Search the web using a public search engine API
 async fn search_web(query: &str, max_results: usize) -> Result<String, String> {
     // Use DuckDuckGo's instant answer API (no API key required)
+    let encoded: String = url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
     let url = format!("https://api.duckduckgo.com/?q={}&format=json&no_html=1&skip_disambig=1",
-        urlencoding(query));
+        encoded);
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
@@ -120,25 +121,6 @@ async fn search_web(query: &str, max_results: usize) -> Result<String, String> {
     Ok(result)
 }
 
-/// URL-encode a string for use in search queries
-fn urlencoding(input: &str) -> String {
-    let mut result = String::with_capacity(input.len() * 3);
-    for byte in input.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(byte as char);
-            }
-            b' ' => {
-                result.push('+');
-            }
-            _ => {
-                result.push_str(&format!("%{:02X}", byte));
-            }
-        }
-    }
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,12 +144,5 @@ mod tests {
         let tool = WebSearchTool;
         let result = tool.execute(serde_json::json!({"query": ""})).await;
         assert!(!result.success);
-    }
-
-    #[test]
-    fn test_urlencoding() {
-        assert_eq!(urlencoding("hello world"), "hello+world");
-        assert_eq!(urlencoding("rust/lang"), "rust%2Flang");
-        assert_eq!(urlencoding("a+b"), "a%2Bb");
     }
 }

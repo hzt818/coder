@@ -66,16 +66,41 @@ impl Tool for FimEditTool {
             return ToolResult::err(format!("Line {} beyond file length {}", line_idx, lines.len()));
         }
 
-        let _prefix = if line_idx > 0 { lines[..line_idx].join("\n") } else { String::new() };
-        let _suffix = if line_idx < lines.len() { lines[line_idx..].join("\n") } else { String::new() };
+        let prefix = if line_idx > 0 { lines[..line_idx].join("\n") } else { String::new() };
+        let suffix = if line_idx < lines.len() { lines[line_idx..].join("\n") } else { String::new() };
 
-        let mut output = format!("FIM edit at {}:{}\n", path, line_idx + 1);
-        output.push_str(&format!("Context: {} lines before, {} lines after\n", line_idx, lines.len() - line_idx));
-        output.push_str("\nGenerated:\n");
-        output.push_str("// TODO: implement\n");
-        output.push_str("\nUse write_file or edit_file to apply.");
+        let instructions = args.get("instructions").and_then(|i| i.as_str()).unwrap_or("");
 
-        ToolResult::ok(output)
+        // Generate the middle section using heuristic-based FIM
+        let generated = fim_simple(&prefix, &suffix, "", instructions);
+
+        if generated.is_empty() {
+            return ToolResult::err("Failed to generate meaningful content");
+        }
+
+        // Assemble the final content: prefix + generated + suffix
+        let new_content = if prefix.is_empty() {
+            format!("{}\n{}", generated, suffix)
+        } else if suffix.is_empty() {
+            format!("{}\n{}", prefix, generated)
+        } else {
+            format!("{}\n{}\n{}", prefix, generated, suffix)
+        };
+
+        // Write the modified content back to the file
+        match std::fs::write(path, &new_content) {
+            Ok(_) => ToolResult::ok(format!(
+                "FIM edit applied at {}:{}\nGenerated: {}",
+                path,
+                line_idx + 1,
+                generated,
+            )),
+            Err(e) => ToolResult::err(format!("Failed to write '{}': {}", path, e)),
+        }
+    }
+
+    fn requires_permission(&self) -> bool {
+        true
     }
 }
 

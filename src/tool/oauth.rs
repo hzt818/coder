@@ -109,6 +109,7 @@ impl Tool for OAuthTool {
             .and_then(|r| r.as_str())
             .unwrap_or("http://localhost:3000/callback")
             .to_string();
+        let _ = &redirect_uri;
 
         match operation {
             "authorize" => oauth_authorize(&provider, &scopes, &client_id, &auth_url, &redirect_uri).await,
@@ -117,6 +118,10 @@ impl Tool for OAuthTool {
             "list" => oauth_list_providers().await,
             _ => ToolResult::err(format!("Unknown OAuth operation: '{}'. Use: authorize, token, refresh, list", operation)),
         }
+    }
+
+    fn requires_permission(&self) -> bool {
+        true
     }
 }
 

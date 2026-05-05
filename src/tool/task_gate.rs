@@ -3,6 +3,8 @@ use super::*;
 use std::sync::Mutex;
 
 static GATES: Mutex<Vec<GateRecord>> = Mutex::new(Vec::new());
+/// Maximum gate records to retain in memory.
+const MAX_GATES: usize = 500;
 
 #[derive(Debug, Clone)]
 struct GateRecord {
@@ -47,8 +49,13 @@ impl Tool for TaskGateTool {
                     return ToolResult::err("task_id and command required");
                 }
                 let start = std::time::Instant::now();
-                let output = tokio::process::Command::new("sh")
-                    .arg("-c").arg(command)
+                let (shell, arg) = if cfg!(target_os = "windows") {
+                    ("cmd.exe", "/C")
+                } else {
+                    ("sh", "-c")
+                };
+                let output = tokio::process::Command::new(shell)
+                    .arg(arg).arg(command)
                     .output().await;
                 let duration = start.elapsed().as_millis() as u64;
                 match output {
@@ -60,6 +67,9 @@ impl Tool for TaskGateTool {
                         let mut gates = GATES.lock().unwrap();
                         let id = gates.len() + 1;
                         gates.push(GateRecord { id, task_id: task_id.into(), command: command.into(), exit_code: code, duration_ms: duration, stdout, stderr, classification: classification.into() });
+                        if gates.len() > MAX_GATES {
+                            gates.remove(0);
+                        }
                         ToolResult::ok(format!("Gate run #{} for task '{}':\nCommand: {}\nExit code: {}\nDuration: {}ms\nClassification: {}", id, task_id, command, code, duration, classification))
                     }
                     Err(e) => ToolResult::err(format!("Failed: {}", e)),
@@ -76,6 +86,10 @@ impl Tool for TaskGateTool {
             }
             _ => ToolResult::err(format!("Unknown operation: {}", op)),
         }
+    }
+
+    fn requires_permission(&self) -> bool {
+        true
     }
 }
 

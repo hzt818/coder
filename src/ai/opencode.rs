@@ -48,7 +48,7 @@ impl OpenCodeProvider {
     }
 
     pub async fn fetch_models(&self) -> anyhow::Result<Vec<String>> {
-        let client = reqwest::Client::new();
+        let client = crate::ai::build_http_client();
         let mut req = client.get(format!("{}/models", self.base_url));
         if let Some(ref key) = self.api_key {
             req = req.header("Authorization", format!("Bearer {}", key));
@@ -111,7 +111,7 @@ impl Provider for OpenCodeProvider {
         config: &GenerateConfig,
     ) -> anyhow::Result<StreamHandler> {
         let (tx, rx) = tokio::sync::mpsc::channel(256);
-        let client = reqwest::Client::new();
+        let client = crate::ai::build_http_client();
         let request_body = self.build_request(messages, tools, config);
         let mut request = client
             .post(format!("{}/chat/completions", self.base_url))
@@ -145,14 +145,7 @@ impl Provider for OpenCodeProvider {
 }
 
 fn messages_to_openai(messages: &[Message]) -> Vec<serde_json::Value> {
-    messages.iter().map(|msg| {
-        let role = msg.role.to_string();
-        let mut json_msg = serde_json::json!({ "role": role, "content": msg.text() });
-        if let Some(tcid) = &msg.tool_call_id {
-            json_msg["tool_call_id"] = serde_json::json!(tcid);
-        }
-        json_msg
-    }).collect()
+    crate::ai::types::messages_to_openai(messages)
 }
 
 #[cfg(test)]

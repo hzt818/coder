@@ -60,6 +60,10 @@ impl Tool for DockerTool {
             _ => ToolResult::err(format!("Unknown docker operation: '{}'. Use: ps, logs, exec, compose", operation)),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 async fn run_docker_cmd(args: &[&str]) -> Result<String, String> {

@@ -88,6 +88,10 @@ impl Tool for WorktreeTool {
             _ => ToolResult::err(format!("Unknown worktree action: '{}'. Use: create, remove, list, prune", action)),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 /// Run a git command in the specified repo

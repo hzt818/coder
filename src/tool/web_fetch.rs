@@ -1,6 +1,7 @@
 //! Web fetch tool - fetches web page content
 
 use async_trait::async_trait;
+use std::net::{IpAddr, Ipv6Addr};
 use super::*;
 
 pub struct WebFetchTool;
@@ -35,6 +36,23 @@ impl Tool for WebFetchTool {
 
         if url.is_empty() {
             return ToolResult::err("URL is required");
+        }
+
+        // Security: only allow http/https schemes
+        let parsed = match url::Url::parse(url) {
+            Ok(u) => u,
+            Err(e) => return ToolResult::err(format!("Invalid URL '{}': {}", url, e)),
+        };
+        if parsed.scheme() != "http" && parsed.scheme() != "https" {
+            return ToolResult::err(format!(
+                "URL scheme '{}' is not allowed. Only http:// and https:// are supported.",
+                parsed.scheme()
+            ));
+        }
+
+        // SSRF protection: block requests to private/internal IPs
+        if let Err(e) = check_ssrf(&parsed).await {
+            return ToolResult::err(e);
         }
 
         match fetch_url(url).await {
@@ -81,13 +99,68 @@ async fn fetch_url(url: &str) -> Result<String, String> {
     result.push('\n');
 
     if body.len() > MAX_SIZE {
-        result.push_str(&body[..MAX_SIZE]);
+        let safe_end = body.floor_char_boundary(MAX_SIZE);
+        result.push_str(&body[..safe_end]);
         result.push_str(&format!("\n... (truncated, {} bytes total)", body.len()));
     } else {
         result.push_str(&body);
     }
 
     Ok(result)
+}
+
+/// SSRF protection: reject requests to private/internal IP ranges.
+async fn check_ssrf(parsed: &url::Url) -> Result<(), String> {
+    let host = parsed.host_str().unwrap_or("");
+    if host.is_empty() {
+        return Err("URL has no host".to_string());
+    }
+
+    // Block obvious private hostnames
+    let lower = host.to_lowercase();
+    if lower == "localhost" || lower == "127.0.0.1" || lower == "::1" || lower.ends_with(".local") || lower.ends_with(".internal") {
+        return Err(format!("SSRF blocked: '{}' is a private/internal hostname", host));
+    }
+
+    // Resolve hostname and check IP ranges
+    if let Ok(addrs) = tokio::net::lookup_host((host, 0)).await {
+        for addr in addrs {
+            if is_private_ip(addr.ip()) {
+                return Err(format!(
+                    "SSRF blocked: '{}' resolves to private IP {}", host, addr.ip()
+                ));
+            }
+        }
+    }
+    // If DNS resolution fails, let the request proceed — it will fail anyway
+
+    Ok(())
+}
+
+/// Check if an IP address belongs to a private/internal range
+fn is_private_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => {
+            // 127.0.0.0/8 (loopback)
+            v4.is_loopback() ||
+            // 10.0.0.0/8 (private class A)
+            v4.octets()[0] == 10 ||
+            // 172.16.0.0/12 (private class B)
+            (v4.octets()[0] == 172 && (v4.octets()[1] & 0xF0) == 16) ||
+            // 192.168.0.0/16 (private class C)
+            (v4.octets()[0] == 192 && v4.octets()[1] == 168) ||
+            // 169.254.0.0/16 (link-local)
+            (v4.octets()[0] == 169 && v4.octets()[1] == 254) ||
+            // 100.64.0.0/10 (Carrier-grade NAT)
+            v4.octets()[0] == 100 && (v4.octets()[1] & 0xC0) == 64
+        }
+        IpAddr::V6(v6) => {
+            // ::1 (loopback)
+            v6 == Ipv6Addr::LOCALHOST ||
+            // fe80::/10 (link-local)
+            v6.octets()[0] == 0xFE && (v6.octets()[1] & 0xC0) == 0x80
+        }
+    }
 }
 
 #[cfg(test)]

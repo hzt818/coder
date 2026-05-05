@@ -72,6 +72,7 @@ impl ToolResult {
     pub fn ok(output: impl Into<String>) -> Self {
         let output = output.into();
         let estimated_tokens = crate::core::pricing::estimate_tokens(&output);
+        let output_len = output.len();
         Self {
             success: true,
             output,
@@ -79,7 +80,7 @@ impl ToolResult {
             metadata: None,
             truncated: false,
             estimated_tokens,
-            original_size: 0,
+            original_size: output_len,
         }
     }
 

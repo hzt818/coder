@@ -22,10 +22,10 @@ pub struct DiagnosticResult {
 /// Severity of a diagnostic
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiagnosticSeverity {
-    Error,
-    Warning,
-    Information,
     Hint,
+    Information,
+    Warning,
+    Error,
 }
 
 impl DiagnosticSeverity {
@@ -80,12 +80,14 @@ pub async fn run_post_edit_lsp<'a>(
                         _ => DiagnosticSeverity::Hint,
                     };
 
+                    let line = diag.line();
+                    let column = diag.column();
                     all_diagnostics.push(DiagnosticResult {
                         severity,
                         message: diag.message,
                         file: file.to_string_lossy().to_string(),
-                        line: diag.line,
-                        column: diag.column,
+                        line,
+                        column,
                         source: client.server_name().to_string(),
                     });
                 }

@@ -116,6 +116,10 @@ impl Tool for SnapshotTool {
             )),
         }
     }
+
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

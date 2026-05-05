@@ -6,19 +6,6 @@ use super::app::ChatMessage;
 use super::theme::AppTheme;
 use super::syntax::highlight_code_block;
 
-/// Try to get the current git branch name for a directory
-fn get_git_branch(dir: &str) -> Option<String> {
-    let output = std::process::Command::new("git")
-        .args(["-C", dir, "branch", "--show-current"])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if branch.is_empty() { None } else { Some(branch) }
-}
-
 /// Parse content and yield either plain lines or code block lines
 fn parse_content<'a>(content: &'a str) -> Vec<ContentLine<'a>> {
     let mut result = Vec::new();
@@ -71,7 +58,7 @@ enum ContentLine<'a> {
 }
 
 /// Render the chat panel
-pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offset: usize, working_dir: &str, theme: &AppTheme) {
+pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offset: usize, working_dir: &str, git_branch: Option<&str>, theme: &AppTheme) {
     let mut lines: Vec<Line> = Vec::new();
 
     for msg in messages {
@@ -162,8 +149,8 @@ pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offs
             Span::styled(working_dir, Style::default().fg(theme.fg)),
         ]));
 
-        // Git branch (if in a git repo)
-        if let Some(branch) = get_git_branch(working_dir) {
+        // Git branch (cached at startup)
+        if let Some(branch) = git_branch {
             lines.push(Line::from(vec![
                 Span::styled(" Git branch: ", Style::default().fg(theme.dim)),
                 Span::styled(branch, Style::default().fg(theme.success)),

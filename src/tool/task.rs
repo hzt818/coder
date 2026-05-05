@@ -11,6 +11,8 @@ struct TaskItem {
 }
 
 static TASKS: Mutex<Vec<TaskItem>> = Mutex::new(Vec::new());
+/// Maximum tasks to keep in memory to prevent unbounded growth.
+const MAX_TASKS: usize = 500;
 
 pub struct TaskTool;
 
@@ -64,6 +66,10 @@ impl Tool for TaskTool {
                     description: desc.to_string(),
                     status: "pending".to_string(),
                 });
+                // Prevent unbounded memory growth by evicting oldest tasks
+                if tasks.len() > MAX_TASKS {
+                    tasks.remove(0);
+                }
                 ToolResult::ok(format!("Task #{} created: {}", id, desc))
             }
             "list" => {

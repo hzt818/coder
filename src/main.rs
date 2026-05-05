@@ -68,6 +68,9 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(format!("coder={}", log_level))
         .init();
 
+    // Initialize core systems
+    coder::core::automation::init_automation_manager();
+
     // Load config
     let config_path = cli.config.clone();
     let config = coder::config::Settings::load(config_path.as_deref())?;
@@ -230,8 +233,11 @@ async fn run_tui_mode(
                     agent.session().message_count()
                 );
             }
-            _ => {
+            Ok(None) => {
                 println!("Session not found: {}", session_id);
+            }
+            Err(e) => {
+                eprintln!("Failed to load session '{}': {}. Starting new session.", session_id, e);
             }
         }
     }

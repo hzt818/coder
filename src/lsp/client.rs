@@ -3,6 +3,7 @@
 //! Manages the lifecycle of LSP server processes and provides
 //! methods for sending requests and handling notifications.
 
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -276,6 +277,43 @@ impl LspClient {
     /// Get current server capabilities.
     pub async fn capabilities(&self) -> ServerCapabilities {
         self.capabilities.read().await.clone()
+    }
+
+    /// Check whether this LSP server supports the given file extension.
+    pub fn supports_extension(&self, extension: &str) -> bool {
+        matches!(
+            (self.server_config.language_id.as_str(), extension),
+            ("rust", "rs")
+                | ("typescript", "ts")
+                | ("typescript", "tsx")
+                | ("javascript", "js")
+                | ("javascript", "jsx")
+                | ("python", "py")
+                | ("go", "go")
+        )
+    }
+
+    /// Request diagnostics for a file from the LSP server.
+    ///
+    /// Sends `textDocument/diagnostic` (proposed LSP) or falls back to
+    /// parsing published `textDocument/publishDiagnostics` notifications
+    /// accumulated since the last request.
+    pub async fn request_diagnostics(&self, file: &Path) -> anyhow::Result<Vec<super::Diagnostic>> {
+        let uri = format!("file://{}", file.display());
+        let params = serde_json::json!({
+            "textDocument": { "uri": uri }
+        });
+        let result = self.send_request("textDocument/diagnostic", params).await?;
+        let items = result
+            .get("items")
+            .and_then(|v| serde_json::from_value::<Vec<super::Diagnostic>>(v.clone()).ok())
+            .unwrap_or_default();
+        Ok(items)
+    }
+
+    /// Return the human-readable name of this LSP server.
+    pub fn server_name(&self) -> &str {
+        &self.server_config.command
     }
 
     /// Check if the client is initialized.

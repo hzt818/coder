@@ -111,7 +111,8 @@ fn list_directory(
     output.push_str(&format!("Directory: {}\n\n", canonical.display()));
 
     let mut entries: Vec<DirEntry> = Vec::new();
-    collect_entries(dir, 0, max_depth, show_hidden, pattern, &mut entries)?;
+    let mut visited_dirs: std::collections::HashSet<std::path::PathBuf> = std::collections::HashSet::new();
+    collect_entries(dir, 0, max_depth, show_hidden, pattern, &mut entries, &mut visited_dirs)?;
 
     if entries.is_empty() {
         output.push_str("(empty directory)");
@@ -181,9 +182,18 @@ fn collect_entries(
     show_hidden: bool,
     pattern: &str,
     entries: &mut Vec<DirEntry>,
+    visited_dirs: &mut std::collections::HashSet<std::path::PathBuf>,
 ) -> Result<(), String> {
     if depth > max_depth && max_depth != 0 {
         return Ok(());
+    }
+
+    // Symlink cycle detection: canonicalize and track visited directories
+    if let Ok(canonical) = std::fs::canonicalize(dir) {
+        if !visited_dirs.insert(canonical) {
+            // Already visited this directory — symlink cycle detected
+            return Ok(());
+        }
     }
 
     let read_dir = std::fs::read_dir(dir)
@@ -199,10 +209,12 @@ fn collect_entries(
             continue;
         }
 
-        // Filter by glob pattern (simple check)
+        // Filter by glob pattern (uses glob::Pattern for correct matching)
         if !pattern.is_empty() && depth == 0 {
-            if !name.contains(pattern.trim_end_matches('*').trim_start_matches('*')) {
-                // Skip non-matching files at top level; still recurse into dirs
+            let matches = ::glob::Pattern::new(pattern)
+                .map(|p| p.matches(&name))
+                .unwrap_or(false);
+            if !matches {
                 if entry.file_type().map(|t| !t.is_dir()).unwrap_or(true) {
                     continue;
                 }
@@ -264,9 +276,9 @@ fn collect_entries(
             modified,
         });
 
-        // Recurse into subdirectories
+        // Recurse into subdirectories (skip symlinks to avoid cycles)
         if is_dir && depth < max_depth {
-            collect_entries(&entry.path(), depth + 1, max_depth, show_hidden, pattern, entries)?;
+            collect_entries(&entry.path(), depth + 1, max_depth, show_hidden, pattern, entries, visited_dirs)?;
         }
     }
 
@@ -348,7 +360,8 @@ mod tests {
     #[test]
     fn test_collect_entries_current_dir() {
         let mut entries = Vec::new();
-        let result = collect_entries(Path::new("."), 0, 1, false, "", &mut entries);
+        let mut visited = std::collections::HashSet::new();
+        let result = collect_entries(Path::new("."), 0, 1, false, "", &mut entries, &mut visited);
         assert!(result.is_ok());
         // Current directory should have at least some entries
         assert!(!entries.is_empty());

@@ -16,7 +16,7 @@ pub mod commands;
 pub mod i18n;
 pub mod sandbox;
 
-// Phase 1+
+// Phase 1
 #[cfg(feature = "team")]
 pub mod team;
 #[cfg(feature = "skill")]
@@ -32,7 +32,7 @@ pub mod lsp;
 #[cfg(feature = "mcp")]
 pub mod mcp;
 
-// Phase 2+
+// Phase 2
 #[cfg(feature = "server")]
 pub mod server;
 #[cfg(feature = "permission")]

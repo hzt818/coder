@@ -137,7 +137,7 @@ pub fn compact_messages(messages: &[Message], config: &CompactionConfig) -> Comp
 }
 
 /// Build a summary message from older messages
-fn build_summary(messages: &[Message]) -> Message {
+pub fn build_summary(messages: &[Message]) -> Message {
     // Count tool calls and user messages
     let user_count = messages
         .iter()

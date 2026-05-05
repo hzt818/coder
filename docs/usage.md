@@ -39,33 +39,29 @@ Coder 使用 Cargo Feature Flags 控制功能开关，可按需启用：
 
 ```bash
 # 等价于默认特性集
-cargo build --release --features "tui,ai-openai,ai-anthropic,ai-opencode,tools-core"
+cargo build --release --features "tui,ai-openai,ai-anthropic,ai-opencode"
 ```
 
-#### 完整功能（Phase 1 + Phase 2 + Phase 3）
+#### 完整功能（Phase 1 + Phase 2）
 
 ```bash
 # 启用全部功能
-cargo build --release --features "tui,ai-openai,ai-anthropic,ai-google,ai-opencode,tools-core,tools-git,tools-docker,tools-db,tools-oauth,tools-computer,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,adapters-telegram,permission,computer,worktree"
+cargo build --release --features "tui,ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,computer,worktree"
 ```
 
 #### 按阶段选择
 
 | 阶段 | 功能 | 说明 |
 |------|------|------|
-| **核心** | `tui`, `ai-openai`, `ai-anthropic`, `ai-opencode`, `tools-core` | 基础使用必备 |
+| **核心** | `tui`, `ai-openai`, `ai-anthropic`, `ai-opencode` | 基础使用必备 |
 | **Phase 1** | `team`, `skill`, `subagent`, `memory`, `storage`, `lsp`, `mcp` | 团队协作、技能系统、MCP、LSP |
-| **Phase 2** | `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `computer`, `worktree`, `tools-docker`, `tools-db` | HTTP API、权限控制、云同步、语音、桌面自动化 |
-| **Phase 3** | `adapters-telegram` | 平台适配器（Telegram 等） |
+| **Phase 2** | `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `computer`, `worktree`, `tools-git`, `tools-docker`, `tools-db`, `tools-oauth` | HTTP API、权限控制、云同步、语音、桌面自动化 |
 
 **常用构建示例：**
 
 ```bash
 # 开发调试（含 Git 工具）
-cargo build --features "tui,ai-openai,ai-anthropic,ai-opencode,tools-core,tools-git"
-
-# 全功能开发
-cargo build --features "$(grep '^###' Cargo.toml | head -1)"
+cargo build --features "tui,ai-openai,ai-anthropic,ai-opencode,tools-git"
 ```
 
 ---
@@ -657,13 +653,13 @@ Git Worktree 管理：
 - 创建隔离的工作目录
 - 并行分支开发
 
-### Phase 3 功能
+### Phase 3 功能（适配器 — 计划中）
 
 #### Adapters（平台适配器）
 
-将 Coder 集成到即时通讯平台：
+将 Coder 集成到即时通讯平台（特性尚未实现）：
 
-- `Telegram`：通过 Telegram Bot 使用 Coder
+- `Telegram`：通过 Telegram Bot 使用 Coder（计划中）
 - `Feishu`：飞书集成（计划中）
 - `Slack`：Slack 集成（计划中）
 
