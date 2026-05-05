@@ -185,19 +185,25 @@ async fn process_gemini_data(
         .and_then(|r| r.as_str())
     {
         if !finish_reason.is_empty() {
-            let usage = json.get("usageMetadata").map(|u| Usage {
-                input_tokens: u
+            let usage = json.get("usageMetadata").map(|u| {
+                let inp = u
                     .get("promptTokenCount")
                     .and_then(|v| v.as_u64())
-                    .unwrap_or(0),
-                output_tokens: u
+                    .unwrap_or(0);
+                let out = u
                     .get("candidatesTokenCount")
                     .and_then(|v| v.as_u64())
-                    .unwrap_or(0),
-                total_tokens: u
-                    .get("totalTokenCount")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0),
+                    .unwrap_or(0);
+                Usage {
+                    input_tokens: inp,
+                    output_tokens: out,
+                    total_tokens: u
+                        .get("totalTokenCount")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0),
+                    cache_hit_tokens: 0,
+                    cache_miss_tokens: inp,
+                }
             });
 
             let _ = tx

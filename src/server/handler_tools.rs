@@ -85,3 +85,24 @@ pub async fn execute_tool(
     let result = state.tool_registry.execute(&name, body.args).await;
     Ok(Json(ExecuteResponse::from(result)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_list_tools_handler() {
+        let state = Arc::new(AppState::new(
+            crate::session::manager::SessionManager::new(),
+            Arc::new(crate::tool::ToolRegistry::default()),
+            Box::new(crate::ai::openai::OpenAIProvider::new(
+                "test".into(),
+                "https://api.openai.com/v1".into(),
+                "gpt-4o".into(),
+            )),
+        ));
+
+        let result = list_tools(State(state)).await;
+        assert!(!result.0.is_empty(), "list_tools should return tools");
+    }
+}

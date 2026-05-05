@@ -465,6 +465,17 @@ fn find_entry(cmd: &str) -> Option<&'static HelpEntry> {
         .find(|e| e.name == cmd || e.aliases.contains(&cmd))
 }
 
+/// Check whether a given keybinding is covered by the help system.
+///
+/// Currently always returns `true`; this function exists so that
+/// [`CommandPalette`](crate::tui::command_palette::CommandPalette)
+/// can query whether a keybinding (e.g. `"Ctrl+K"`) has corresponding
+/// help content. Future implementations may perform a lookup against
+/// a keybinding registry.
+pub fn has_keybinding(_keybinding: &str) -> bool {
+    true
+}
+
 /// Format a single entry as a one-line summary
 fn format_entry_line(entry: &HelpEntry) -> String {
     let cmd = if entry.aliases.is_empty() {

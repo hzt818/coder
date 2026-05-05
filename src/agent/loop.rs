@@ -3,7 +3,8 @@
 use crate::ai::*;
 use crate::tool::*;
 use super::context::Context;
-use super::types::AgentType;
+use super::types::{AgentType, InteractionMode, ReasoningEffort};
+use super::auto_reasoning;
 
 #[cfg(feature = "permission")]
 use crate::permission::{Action, PermissionEvaluator};
@@ -15,6 +16,10 @@ pub struct Agent {
     context: Context,
     agent_type: AgentType,
     session: crate::session::Session,
+    /// Current interaction mode
+    mode: InteractionMode,
+    /// Current reasoning effort
+    reasoning_effort: ReasoningEffort,
     #[cfg(feature = "permission")]
     permission_evaluator: Option<PermissionEvaluator>,
 }
@@ -32,9 +37,38 @@ impl Agent {
             context,
             agent_type,
             session: crate::session::Session::new(),
+            mode: InteractionMode::default(),
+            reasoning_effort: ReasoningEffort::default(),
             #[cfg(feature = "permission")]
             permission_evaluator: None,
         }
+    }
+
+    /// Get the current interaction mode
+    pub fn mode(&self) -> InteractionMode {
+        self.mode
+    }
+
+    /// Cycle to the next interaction mode
+    pub fn cycle_mode(&mut self) -> InteractionMode {
+        self.mode = self.mode.cycle();
+        self.mode
+    }
+
+    /// Get the current reasoning effort
+    pub fn reasoning_effort(&self) -> ReasoningEffort {
+        self.reasoning_effort
+    }
+
+    /// Cycle to the next reasoning effort level
+    pub fn cycle_reasoning_effort(&mut self) -> ReasoningEffort {
+        self.reasoning_effort = self.reasoning_effort.cycle();
+        self.reasoning_effort
+    }
+
+    /// Set reasoning effort explicitly
+    pub fn set_reasoning_effort(&mut self, effort: ReasoningEffort) {
+        self.reasoning_effort = effort;
     }
 
     /// Get a reference to the tool registry
@@ -73,7 +107,41 @@ impl Agent {
     ///
     /// Returns `None` if the tool is allowed to proceed, or `Some(error_message)`
     /// if execution should be blocked with the given error.
+    /// Respects the current InteractionMode:
+    /// - Plan: only read-only tools allowed; shell/patch blocked
+    /// - YOLO: all tools auto-approved
+    /// - Agent: uses standard permission checks
     fn check_tool_permission(&self, tool_name: &str) -> Option<String> {
+        // YOLO mode: auto-approve everything
+        if self.mode.auto_approve_all() {
+            return None;
+        }
+
+        // Plan mode: only allow read-only tools
+        if self.mode.is_read_only() {
+            // Block shell execution
+            if tool_name == "bash" || tool_name == "exec_shell" {
+                return Some(format!(
+                    "Shell execution is not allowed in Plan mode. \
+                     Switch to Agent or YOLO mode to run '{}'.",
+                    tool_name
+                ));
+            }
+
+            // Block file write/modify operations
+            if tool_name == "file_write"
+                || tool_name == "file_edit"
+                || tool_name == "apply_patch"
+            {
+                return Some(format!(
+                    "'{}' is not allowed in Plan mode. \
+                     Use read-only tools like file_read, grep, list_dir.",
+                    tool_name
+                ));
+            }
+        }
+
+        // For tools that explicitly require permission, check with evaluator
         let tool = match self.tools.get(tool_name) {
             Some(t) => t,
             None => return None,
@@ -118,11 +186,39 @@ impl Agent {
         }
     }
 
+    /// Build a GenerateConfig with current reasoning effort settings
+    fn build_config(&self, prompt: &str) -> GenerateConfig {
+        let mut config = GenerateConfig::default();
+
+        // Resolve reasoning effort
+        match self.reasoning_effort {
+            ReasoningEffort::Auto => {
+                let selected = auto_reasoning::select_effort(prompt);
+                if let Some(api_value) = selected.api_value() {
+                    config.reasoning_effort = Some(api_value.to_string());
+                }
+                if selected.is_thinking_enabled() {
+                    config.thinking_budget = Some(2048);
+                }
+            }
+            _ => {
+                if let Some(api_value) = self.reasoning_effort.api_value() {
+                    config.reasoning_effort = Some(api_value.to_string());
+                }
+                if self.reasoning_effort.is_thinking_enabled() {
+                    config.thinking_budget = Some(2048);
+                }
+            }
+        }
+
+        config
+    }
+
     /// Simple one-shot query (for --print mode)
     pub async fn run_simple(&self, query: &str) -> anyhow::Result<String> {
         let messages = vec![Message::user(query)];
         let tool_defs = self.tools.tool_defs();
-        let config = GenerateConfig::default();
+        let config = self.build_config(query);
 
         let response = self.provider.chat(&messages, &tool_defs, &config).await?;
         Ok(response.text())
@@ -181,7 +277,7 @@ impl Agent {
         for _turn in 0..10 {
             let messages = self.context.build_request();
             let tool_defs = self.tools.tool_defs();
-            let config = GenerateConfig::default();
+            let config = self.build_config(user_input);
 
             match self
                 .provider
@@ -296,6 +392,8 @@ pub enum AgentEvent {
     },
     /// Text content chunk
     TextChunk(String),
+    /// Reasoning/thinking content chunk
+    ReasoningChunk(String),
     /// Tool call started
     ToolCallStart {
         id: String,
@@ -313,4 +411,20 @@ pub enum AgentEvent {
     },
     /// Error occurred
     Error(String),
+    /// Mode changed
+    ModeChanged {
+        mode: super::InteractionMode,
+    },
+    /// Reasoning effort changed
+    ReasoningEffortChanged {
+        effort: super::ReasoningEffort,
+    },
+    /// Cost estimate for the turn
+    CostEstimate {
+        estimate: crate::core::pricing::CostEstimate,
+    },
+    /// Context compaction event
+    Compaction {
+        result: crate::core::compaction::CompactionResult,
+    },
 }

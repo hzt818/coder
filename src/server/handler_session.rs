@@ -189,3 +189,23 @@ pub async fn chat_stream(
 
     Ok(sse.into_response())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::manager::SessionManager;
+
+    #[test]
+    fn test_app_state_creation() {
+        let state = AppState::new(
+            SessionManager::new(),
+            Arc::new(crate::tool::ToolRegistry::default()),
+            Box::new(crate::ai::openai::OpenAIProvider::new(
+                "test".into(),
+                "https://api.openai.com/v1".into(),
+                "gpt-4o".into(),
+            )),
+        );
+        assert!(state.tool_registry.len() >= 10, "default registry should have at least 10 tools");
+    }
+}

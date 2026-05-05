@@ -111,12 +111,49 @@ pub struct ToolCall {
     pub arguments: serde_json::Value,
 }
 
-/// Token usage statistics
+/// Token usage statistics with cache breakdown
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {
     pub input_tokens: u64,
     pub output_tokens: u64,
     pub total_tokens: u64,
+    /// Tokens served from cache hit (prefix caching)
+    #[serde(default)]
+    pub cache_hit_tokens: u64,
+    /// Tokens from cache miss (actual input)
+    #[serde(default)]
+    pub cache_miss_tokens: u64,
+}
+
+impl Usage {
+    /// Create usage from input/output token counts
+    pub fn new(input: u64, output: u64) -> Self {
+        Self {
+            input_tokens: input,
+            output_tokens: output,
+            total_tokens: input + output,
+            cache_hit_tokens: 0,
+            cache_miss_tokens: input,
+        }
+    }
+
+    /// Set cache breakdown from API response headers
+    pub fn with_cache(mut self, hit: u64, miss: u64) -> Self {
+        self.cache_hit_tokens = hit;
+        self.cache_miss_tokens = miss;
+        self
+    }
+
+    /// Calculate cost estimate for this usage against a model
+    pub fn cost_estimate(&self, model: &str) -> crate::core::pricing::CostEstimate {
+        crate::core::pricing::calculate_cost(
+            model,
+            self.input_tokens,
+            self.output_tokens,
+            self.cache_hit_tokens,
+            self.cache_miss_tokens,
+        )
+    }
 }
 
 /// Event from streaming response
@@ -148,6 +185,7 @@ pub struct GenerateConfig {
     pub temperature: f64,
     pub top_p: f64,
     pub thinking_budget: Option<u64>,
+    pub reasoning_effort: Option<String>,
 }
 
 impl Default for GenerateConfig {
@@ -157,6 +195,7 @@ impl Default for GenerateConfig {
             temperature: 0.7,
             top_p: 0.9,
             thinking_budget: None,
+            reasoning_effort: None,
         }
     }
 }

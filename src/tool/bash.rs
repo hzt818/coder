@@ -7,6 +7,7 @@ use super::*;
 pub struct BashTool {
     pub default_timeout: u64,
     pub max_output_bytes: usize,
+    pub sandbox_backend: Option<std::sync::Arc<dyn crate::sandbox::SandboxBackend>>,
 }
 
 impl Default for BashTool {
@@ -14,6 +15,7 @@ impl Default for BashTool {
         Self {
             default_timeout: 300,
             max_output_bytes: 1_048_576,
+            sandbox_backend: None,
         }
     }
 }

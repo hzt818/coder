@@ -26,9 +26,11 @@ pub mod status_bar;
 pub mod detail_popup;
 pub mod mention_popup;
 pub mod help;
+pub mod command_palette;
 pub mod theme;
 pub mod syntax;
 pub mod dialog_provider_setup;
+pub mod vim;
 
 pub use app::App;
 

@@ -16,7 +16,7 @@ pub mod glob;
 pub mod grep;
 pub mod question;
 
-// Phase 1+ tools
+// Phase 1+ tools (always compiled)
 #[cfg(feature = "tools-git")]
 pub mod git;
 pub mod web_fetch;
@@ -24,11 +24,21 @@ pub mod web_search;
 pub mod docs;
 pub mod task;
 pub mod plan;
+pub mod apply_patch;
+pub mod fim_edit;
+pub mod list_dir;
+pub mod checklist;
+pub mod rlm;
+pub mod task_gate;
+pub mod automation_tool;
+pub mod pr_attempt;
+pub mod snapshot_tool;
+pub mod github;
+pub mod ci;
 
-// Phase 2 tools
+// Phase 2 tools (feature-gated)
 #[cfg(feature = "tools-docker")]
 pub mod docker;
-pub mod ci;
 #[cfg(feature = "tools-db")]
 pub mod db_query;
 #[cfg(feature = "tools-oauth")]
@@ -47,15 +57,29 @@ pub struct ToolResult {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<std::collections::HashMap<String, String>>,
+    /// Whether the output was truncated by capacity control
+    #[serde(default)]
+    pub truncated: bool,
+    /// Estimated token count of the output
+    #[serde(default)]
+    pub estimated_tokens: usize,
+    /// Original output size before potential truncation
+    #[serde(default)]
+    pub original_size: usize,
 }
 
 impl ToolResult {
     pub fn ok(output: impl Into<String>) -> Self {
+        let output = output.into();
+        let estimated_tokens = crate::core::pricing::estimate_tokens(&output);
         Self {
             success: true,
-            output: output.into(),
+            output,
             error: None,
             metadata: None,
+            truncated: false,
+            estimated_tokens,
+            original_size: 0,
         }
     }
 
@@ -65,7 +89,32 @@ impl ToolResult {
             output: String::new(),
             error: Some(error.into()),
             metadata: None,
+            truncated: false,
+            estimated_tokens: 0,
+            original_size: 0,
         }
+    }
+
+    /// Check if this result is "large" for capacity routing
+    pub fn is_large(&self, threshold_tokens: usize) -> bool {
+        self.estimated_tokens > threshold_tokens
+    }
+
+    /// Apply capacity routing to truncate output if needed
+    pub fn apply_capacity(mut self, tool_name: &str, config: &crate::core::capacity::CapacityConfig) -> Self {
+        let check = crate::core::capacity::check_capacity(tool_name, &self.output, config);
+        if check.truncated {
+            self.original_size = self.output.len();
+            self.output = crate::core::capacity::truncate_output(
+                &self.output,
+                config.max_output_bytes,
+                config.max_output_tokens,
+                tool_name,
+            );
+            self.truncated = true;
+            self.estimated_tokens = check.estimated_tokens;
+        }
+        self
     }
 }
 

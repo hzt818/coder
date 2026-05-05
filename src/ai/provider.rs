@@ -43,7 +43,6 @@ pub trait Provider: Send + Sync + std::fmt::Debug {
         let mut content = String::new();
         let mut tool_calls = Vec::new();
 
-        use tokio::sync::mpsc::Receiver;
         while let Some(event) = stream.recv().await {
             match event {
                 StreamEvent::TextChunk(chunk) => content.push_str(&chunk),

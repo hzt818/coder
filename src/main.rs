@@ -41,6 +41,10 @@ struct Cli {
     /// Enable verbose logging
     #[arg(long, short = 'v')]
     verbose: bool,
+
+    /// Start the HTTP server (requires 'server' feature)
+    #[arg(long)]
+    serve: bool,
 }
 
 #[tokio::main]
@@ -67,6 +71,27 @@ async fn main() -> anyhow::Result<()> {
     // Load config
     let config_path = cli.config.clone();
     let config = coder::config::Settings::load(config_path.as_deref())?;
+
+    // If --serve flag is set, start the HTTP server
+    if cli.serve {
+        #[cfg(feature = "server")]
+        {
+            let provider = create_provider(&config, &cli)?;
+            let tools = std::sync::Arc::new(coder::tool::ToolRegistry::default());
+            let state = std::sync::Arc::new(coder::server::AppState::new(
+                coder::session::manager::SessionManager::new(),
+                tools,
+                provider,
+            ));
+            let addr: std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();
+            coder::server::serve(&addr, state).await?;
+            return Ok(());
+        }
+        #[cfg(not(feature = "server"))]
+        {
+            anyhow::bail!("Server feature not enabled. Build with --features server");
+        }
+    }
 
     // Handle --print mode (one-shot)
     if let Some(ref query) = cli.print {

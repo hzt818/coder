@@ -10,6 +10,11 @@ pub mod session;
 pub mod tool;
 pub mod tui;
 pub mod util;
+pub mod core;
+pub mod execpolicy;
+pub mod commands;
+pub mod i18n;
+pub mod sandbox;
 
 // Phase 1+
 #[cfg(feature = "team")]
@@ -45,6 +50,3 @@ pub mod computer;
 #[cfg(feature = "worktree")]
 pub mod worktree;
 
-// Phase 3+
-#[cfg(feature = "adapters-telegram")]
-pub mod adapters;

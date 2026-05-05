@@ -58,6 +58,14 @@ impl AnthropicProvider {
             body["system"] = serde_json::json!(system_content);
         }
 
+        // Add thinking configuration if budget is specified
+        if let Some(budget) = config.thinking_budget {
+            body["thinking"] = serde_json::json!({
+                "type": "enabled",
+                "budget_tokens": budget
+            });
+        }
+
         if !tools.is_empty() {
             body["tools"] = serde_json::json!(tools);
         }
@@ -171,11 +179,14 @@ impl Provider for AnthropicProvider {
                                     "message_start" => {
                                         if let Some(msg) = json.get("message") {
                                             if let Some(u) = msg.get("usage") {
+                                                let inp = u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                                let out = u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
                                                 final_usage = Some(Usage {
-                                                    input_tokens: u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                                                    output_tokens: u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                                                    total_tokens: u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0)
-                                                        + u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                                                    input_tokens: inp,
+                                                    output_tokens: out,
+                                                    total_tokens: inp + out,
+                                                    cache_hit_tokens: u.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                                                    cache_miss_tokens: inp,
                                                 });
                                             }
                                         }
@@ -244,10 +255,13 @@ impl Provider for AnthropicProvider {
                                         }
                                         if let Some(u) = json.get("usage") {
                                             let input = final_usage.as_ref().map(|u| u.input_tokens).unwrap_or(0);
+                                            let out = u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
                                             final_usage = Some(Usage {
                                                 input_tokens: input,
-                                                output_tokens: u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                                                total_tokens: input + u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                                                output_tokens: out,
+                                                total_tokens: input + out,
+                                                cache_hit_tokens: 0,
+                                                cache_miss_tokens: input,
                                             });
                                         }
                                     }
@@ -285,7 +299,7 @@ fn messages_to_anthropic(messages: &[&Message]) -> Vec<serde_json::Value> {
                 _ => "user",
             };
 
-            let mut json_msg = serde_json::json!({
+            let json_msg = serde_json::json!({
                 "role": role,
                 "content": msg.text(),
             });

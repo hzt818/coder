@@ -7,6 +7,7 @@ use super::app::{App, AppMode, InputSubmode};
 use super::chat_panel;
 use super::input;
 use super::mention_popup;
+use super::vim::Action;
 use super::detail_popup;
 use super::status_bar;
 use super::theme::AppTheme;
@@ -207,7 +208,7 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
     );
 
     // Determine mode hint based on input content and submode
-    let mode_hint = if matches!(app.input_submode, InputSubmode::Mention { .. }) {
+    let mode_hint: &str = if matches!(app.input_submode, InputSubmode::Mention { .. }) {
         "Tab/↑↓ Select · Enter Confirm · Esc Cancel"
     } else if app.mode == AppMode::Streaming {
         "Interrupt · Ctrl+C"
@@ -231,7 +232,7 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
         }
     };
 
-    input::render_input(frame, layout[2], app, &mode_hint, theme);
+    input::render_input(frame, layout[2], app, mode_hint, theme);
 
     // @ mention popup
     if matches!(app.input_submode, InputSubmode::Mention { .. }) {
@@ -423,7 +424,7 @@ fn render_welcome(frame: &mut Frame, area: Rect, app: &App, theme: &AppTheme) {
     frame.render_widget(welcome_para, content_area);
 
     // ── Input area at bottom ──
-    let mode_hint = if app.input.starts_with('!') {
+    let mode_hint: &str = if app.input.starts_with('!') {
         "Enter to execute shell"
     } else if app.input.starts_with('?') {
         "Enter for help"
@@ -464,6 +465,52 @@ fn handle_input_mode(app: &mut App, key: crossterm::event::KeyEvent) -> InputAct
             }
             _ => {}
         }
+    }
+
+    // ── Vim normal mode key handling ──
+    if !app.vim_state.is_insert() {
+        let actions = app.vim_state.handle_normal_key(key);
+        for action in actions {
+            match action {
+                Action::NoAction => {}
+                Action::MoveLeft => app.cursor_left(),
+                Action::MoveRight => app.cursor_right(),
+                Action::MoveUp => app.history_back(),
+                Action::MoveDown => app.history_forward(),
+                Action::MoveHome => app.cursor_home(),
+                Action::MoveEnd => app.cursor_end(),
+                Action::DeleteChar => app.delete_char(),
+                Action::Backspace => app.backspace(),
+                Action::DeleteToEnd => {
+                    if app.cursor_pos < app.input.len() {
+                        app.input.truncate(app.cursor_pos);
+                    }
+                }
+                Action::DeleteLine => {
+                    app.input.clear();
+                    app.cursor_pos = 0;
+                }
+                Action::InsertChar(c) => app.insert_char(c),
+                Action::EnterInsertMode => {
+                    app.vim_state.enter_insert_mode();
+                }
+                Action::EnterNormalMode => {
+                    app.mode = AppMode::Normal;
+                }
+                Action::Submit => {
+                    let input = app.input.trim().to_string();
+                    if !input.is_empty() {
+                        app.input.clear();
+                        app.cursor_pos = 0;
+                        app.mark_status_dirty();
+                        return InputAction::SendMessage(input);
+                    }
+                }
+            }
+        }
+        // Skip regular input handling when in vim normal mode
+        app.mark_status_dirty();
+        return InputAction::None;
     }
 
     // Ctrl+ combinations
@@ -574,7 +621,8 @@ fn handle_input_mode(app: &mut App, key: crossterm::event::KeyEvent) -> InputAct
             }
         }
         KeyCode::Esc => {
-            app.mode = AppMode::Normal;
+            // Toggle to vim normal mode (stay in AppMode::Input for navigation)
+            app.vim_state.enter_normal_mode();
             app.mark_status_dirty();
         }
         _ => {}

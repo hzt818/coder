@@ -20,7 +20,7 @@ pub use types::*;
 
 /// Create a provider instance from configuration.
 pub fn create_provider(
-    name: &str,
+    _name: &str,
     config: crate::config::ProviderConfig,
     model_override: Option<String>,
 ) -> anyhow::Result<Box<dyn Provider>> {

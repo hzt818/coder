@@ -20,7 +20,7 @@ fn get_git_branch(dir: &str) -> Option<String> {
 }
 
 /// Parse content and yield either plain lines or code block lines
-fn parse_content(content: &str) -> Vec<ContentLine> {
+fn parse_content<'a>(content: &'a str) -> Vec<ContentLine<'a>> {
     let mut result = Vec::new();
     let mut in_code_block = false;
     let mut code_language = String::new();

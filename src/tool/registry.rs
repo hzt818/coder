@@ -100,6 +100,16 @@ impl Default for ToolRegistry {
         reg.register(Arc::new(docs::DocsTool));
         reg.register(Arc::new(plan::PlanTool));
         reg.register(Arc::new(task::TaskTool));
+        reg.register(Arc::new(apply_patch::ApplyPatchTool));
+        reg.register(Arc::new(fim_edit::FimEditTool));
+        reg.register(Arc::new(list_dir::ListDirTool));
+        reg.register(Arc::new(checklist::ChecklistTool));
+        reg.register(Arc::new(snapshot_tool::SnapshotTool));
+        reg.register(Arc::new(github::GitHubTool));
+        reg.register(Arc::new(rlm::RlmTool));
+        reg.register(Arc::new(task_gate::TaskGateTool));
+        reg.register(Arc::new(automation_tool::AutomationTool));
+        reg.register(Arc::new(pr_attempt::PrAttemptTool));
 
         reg
     }
@@ -112,9 +122,13 @@ mod tests {
     #[test]
     fn test_registry_default() {
         let reg = ToolRegistry::default();
-        assert!(reg.len() >= 10);
+        assert!(reg.len() >= 13);
         assert!(reg.get("bash").is_some());
         assert!(reg.get("file_read").is_some());
+        assert!(reg.get("apply_patch").is_some());
+        assert!(reg.get("list_dir").is_some());
+        assert!(reg.get("checklist").is_some());
+        assert!(reg.get("snapshot").is_some());
     }
 
     #[test]

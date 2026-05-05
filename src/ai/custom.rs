@@ -6,6 +6,7 @@ use super::provider::{Provider, StreamHandler};
 
 /// Custom provider with user-defined templates
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct CustomProvider {
     api_key: String,
     base_url: String,

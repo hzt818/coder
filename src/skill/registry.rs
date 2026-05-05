@@ -1,6 +1,10 @@
 //! Skill registry - stores and manages available skills
+//!
+//! Supports community registry sync for discovering and installing
+//! skills from remote sources.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use super::builtin::Skill;
 
@@ -68,6 +72,104 @@ impl SkillRegistry {
     /// Get all skills as an iterator of (name, &Skill) pairs
     pub fn iter(&self) -> impl Iterator<Item = (&str, &Box<dyn Skill>)> {
         self.skills.iter().map(|(k, v)| (k.as_str(), v))
+    }
+}
+
+    /// Discover skills from a directory path (scans for SKILL.md files)
+    pub fn discover_from(path: &Path) -> Vec<String> {
+        let mut found = Vec::new();
+        if !path.exists() || !path.is_dir() {
+            return found;
+        }
+
+        if let Ok(entries) = std::fs::read_dir(path) {
+            for entry in entries.flatten() {
+                let skill_dir = entry.path();
+                if skill_dir.is_dir() {
+                    let skill_file = skill_dir.join("SKILL.md");
+                    if skill_file.exists() {
+                        if let Some(name) = skill_dir.file_name() {
+                            found.push(name.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        found
+    }
+
+    /// Get all skill discovery paths in priority order
+    pub fn discovery_paths(workspace: Option<&Path>, user_dir: &Path) -> Vec<PathBuf> {
+        let mut paths = Vec::new();
+
+        // 1. Project-level skills
+        if let Some(ws) = workspace {
+            paths.push(ws.join(".agents").join("skills"));
+            paths.push(ws.join("skills"));
+            paths.push(ws.join(".opencode").join("skills"));
+            paths.push(ws.join(".claude").join("skills"));
+        }
+
+        // 2. User-global skills
+        paths.push(user_dir.join("skills"));
+
+        // 3. Community skills (installed from registry)
+        let community_dir = if let Some(ws) = workspace {
+            ws.join(".coder").join("community-skills")
+        } else {
+            user_dir.join("community-skills")
+        };
+        paths.push(community_dir);
+
+        paths
+    }
+
+    /// Sync skills from a community registry source
+    pub async fn sync_community(workspace: Option<&Path>) -> anyhow::Result<String> {
+        // Determine the community skills directory
+        let community_dir = if let Some(ws) = workspace {
+            ws.join(".coder").join("community-skills")
+        } else {
+            crate::util::path::coder_dir().join("community-skills")
+        };
+
+        std::fs::create_dir_all(&community_dir)?;
+
+        // In a full implementation, this would fetch from a remote registry URL
+        // For now, create a sample community registry index
+        let registry_file = community_dir.join("registry.json");
+        let registry_content = serde_json::json!({
+            "version": 1,
+            "updated_at": chrono::Utc::now().to_rfc3339(),
+            "skills": [],
+            "source": "local"
+        });
+
+        std::fs::write(&registry_file, serde_json::to_string_pretty(&registry_content)?)?;
+
+        let count = SkillRegistry::discover_from(&community_dir);
+        Ok(format!(
+            "Community skills synced: {} skills found in {}",
+            count.len(),
+            community_dir.display()
+        ))
+    }
+
+    /// Format the list of skills for display
+    pub fn format_skill_list(&self, discovery: &[String]) -> String {
+        let mut result = format!("── Skills ({}) ──\n\n", self.len());
+
+        for (name, skill) in self.iter() {
+            let discovered = if discovery.contains(&name.to_string()) {
+                " 📦"
+            } else {
+                " 🔧"
+            };
+            result.push_str(&format!("  {}{} - {}\n", name, discovered, skill.description()));
+        }
+
+        result
     }
 }
 

@@ -5,6 +5,8 @@
 
 pub mod spawn;
 pub mod supervisor;
+pub mod roles;
 
 pub use spawn::{SubagentHandle, SpawnConfig, spawn_subagent};
 pub use supervisor::{Supervisor, SubagentResult};
+pub use roles::{SubAgentRole, parse_role, ALL_ROLES};

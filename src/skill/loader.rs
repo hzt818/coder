@@ -1,5 +1,9 @@
 //! Skill loader - discovers and loads skills from configuration
+//!
+//! Supports multi-path discovery from project directories,
+//! user directories, and community registry.
 
+use std::path::{Path, PathBuf};
 use super::registry::SkillRegistry;
 
 /// Configuration for loading a skill
@@ -85,6 +89,24 @@ impl SkillLoader {
     /// Get the list of enabled skill names
     pub fn enabled(&self) -> &[String] {
         &self.enabled_skills
+    }
+
+    /// Discover skills from all standard locations
+    pub fn discover_all(workspace: Option<&Path>) -> Vec<String> {
+        let user_dir = crate::util::path::coder_dir();
+        let paths = SkillRegistry::discovery_paths(workspace, &user_dir);
+
+        let mut all_skills = Vec::new();
+        for path in &paths {
+            let found = SkillRegistry::discover_from(path);
+            for skill in found {
+                if !all_skills.contains(&skill) {
+                    all_skills.push(skill);
+                }
+            }
+        }
+
+        all_skills
     }
 
     /// Add a custom skill configuration

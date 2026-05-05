@@ -2,8 +2,10 @@
 
 use crate::agent::Agent;
 use crate::agent::r#loop::AgentEvent;
+use crate::agent::{InteractionMode, ReasoningEffort};
 use crate::session::manager::SessionManager;
 use crate::tui::help;
+use crate::tui::vim::VimState;
 
 /// Application modes
 #[derive(Debug, Clone, PartialEq)]
@@ -74,18 +76,27 @@ pub struct App {
     /// Token usage
     pub total_input_tokens: u64,
     pub total_output_tokens: u64,
+    /// Cost tracking
+    pub total_cost: f64,
+    pub session_cost: f64,
     /// Welcome screen info
     pub model_name: String,
     pub provider_name: String,
     pub working_dir: String,
     /// Session persistence manager
     pub session_manager: SessionManager,
+    /// Current interaction mode (Plan/Agent/YOLO)
+    pub interaction_mode: InteractionMode,
+    /// Current reasoning effort
+    pub reasoning_effort: ReasoningEffort,
     /// Cached status text (interior mutability for &self access)
     cached_status: std::cell::RefCell<String>,
     /// Whether the status cache is dirty
     cached_status_dirty: std::cell::Cell<bool>,
     /// Cached mention candidates (built once to avoid per-frame allocation)
     mention_all_candidates: Vec<String>,
+    /// Vim modal editing state
+    pub vim_state: VimState,
 }
 
 /// A message rendered in the chat panel
@@ -128,13 +139,18 @@ impl App {
             history_position: None,
             total_input_tokens: 0,
             total_output_tokens: 0,
+            total_cost: 0.0,
+            session_cost: 0.0,
             model_name,
             provider_name,
             working_dir,
             session_manager: SessionManager::new(),
+            interaction_mode: InteractionMode::default(),
+            reasoning_effort: ReasoningEffort::default(),
             cached_status: std::cell::RefCell::new(String::new()),
             cached_status_dirty: std::cell::Cell::new(true),
             mention_all_candidates,
+            vim_state: VimState::new(),
         }
     }
 
@@ -334,7 +350,7 @@ impl App {
     /// Replaces the `@query` in the input with `@item_name `
     pub fn confirm_mention(&mut self) {
         if let InputSubmode::Mention {
-            ref query,
+            query: _,
             ref items,
             selected,
             ..
@@ -561,12 +577,37 @@ impl App {
                 (true, Some("Conversation cleared.".to_string()))
             }
             "compact" => {
-                // Keep only the last 10 messages
-                if self.messages.len() > 10 {
-                    let keep = self.messages.split_off(self.messages.len() - 10);
-                    self.messages = keep;
+                // Use the intelligent compaction module
+                if self.messages.is_empty() {
+                    (true, Some("No messages to compact.".to_string()))
+                } else {
+                    // Convert ChatMessages to AI Messages for compaction
+                    let ai_msgs: Vec<crate::ai::Message> = self.messages.iter()
+                        .filter(|m| m.role == "user" || m.role == "assistant")
+                        .map(|m| {
+                            if m.role == "user" {
+                                crate::ai::Message::user(&m.content)
+                            } else {
+                                crate::ai::Message::assistant(&m.content)
+                            }
+                        })
+                        .collect();
+
+                    let config = crate::core::compaction::CompactionConfig::default();
+                    let result = crate::core::compaction::compact_messages(&ai_msgs, &config);
+
+                    if result.summary_added {
+                        // Replace display messages with compacted version
+                        let recent_count = result.compacted_messages.saturating_sub(1);
+                        if recent_count < self.messages.len() {
+                            let split_at = self.messages.len().saturating_sub(recent_count);
+                            self.messages.drain(..split_at);
+                        }
+                        (true, Some(crate::core::compaction::format_compaction_result(&result)))
+                    } else {
+                        (true, Some("No compaction needed.".to_string()))
+                    }
                 }
-                (true, Some("Context compacted (kept last 10 messages).".to_string()))
             }
             "summarize" => {
                 let summary = format!(
@@ -683,6 +724,77 @@ impl App {
             }
             "quit" | "q" | "exit" => {
                 std::process::exit(0);
+            }
+
+            // ── Cost commands ──
+            "cost" => {
+                let cost_str = format!(
+                    "── Cost Report ──\n\n\
+                     Input tokens: {}\nOutput tokens: {}\nTotal tokens: {}\n\
+                     Session cost: ${:.6}\nPer-1K input: ~{:.4}\n\n\
+                     Costs are estimates based on model pricing.",
+                    crate::util::format::format_tokens(self.total_input_tokens),
+                    crate::util::format::format_tokens(self.total_output_tokens),
+                    crate::util::format::format_tokens(self.total_input_tokens + self.total_output_tokens),
+                    self.session_cost,
+                    if self.total_input_tokens > 0 {
+                        self.session_cost / (self.total_input_tokens as f64 / 1000.0)
+                    } else {
+                        0.0
+                    },
+                );
+                (true, Some(cost_str))
+            }
+            "checkpoint" => {
+                let info = crate::core::checkpoint::format_checkpoint_info();
+                (true, Some(info))
+            }
+
+            // ── Mode commands ──
+            "mode" => {
+                let lower = args.to_lowercase();
+                if lower == "plan" || lower == "p" {
+                    self.interaction_mode = InteractionMode::Plan;
+                    (true, Some("Switched to Plan mode (read-only, planning focus)".to_string()))
+                } else if lower == "agent" || lower == "a" {
+                    self.interaction_mode = InteractionMode::Agent;
+                    (true, Some("Switched to Agent mode (interactive with approval)".to_string()))
+                } else if lower == "yolo" || lower == "y" {
+                    self.interaction_mode = InteractionMode::Yolo;
+                    (true, Some("Switched to YOLO mode (auto-approve all tools)".to_string()))
+                } else {
+                    let msg = format!(
+                        "Current mode: {} {}\n\nAvailable modes:\n  /mode plan  - Read-only investigation\n  /mode agent - Interactive with approvals (default)\n  /mode yolo  - Auto-approve all tools\n\nShortcut: Tab cycles through modes",
+                        self.interaction_mode.indicator(),
+                        self.interaction_mode.display_name(),
+                    );
+                    (true, Some(msg))
+                }
+            }
+            "effort" | "e" => {
+                let lower = args.to_lowercase();
+                if lower == "off" {
+                    self.reasoning_effort = ReasoningEffort::Off;
+                    (true, Some("Reasoning effort set to: off".to_string()))
+                } else if lower == "low" || lower == "l" {
+                    self.reasoning_effort = ReasoningEffort::Low;
+                    (true, Some("Reasoning effort set to: low".to_string()))
+                } else if lower == "high" || lower == "h" {
+                    self.reasoning_effort = ReasoningEffort::High;
+                    (true, Some("Reasoning effort set to: high".to_string()))
+                } else if lower == "max" || lower == "m" {
+                    self.reasoning_effort = ReasoningEffort::Max;
+                    (true, Some("Reasoning effort set to: max".to_string()))
+                } else if lower == "auto" {
+                    self.reasoning_effort = ReasoningEffort::Auto;
+                    (true, Some("Reasoning effort set to: auto (automatic selection based on prompt)".to_string()))
+                } else {
+                    let msg = format!(
+                        "Current reasoning effort: {}\n\nAvailable:\n  /effort off   - No extended thinking\n  /effort low    - Light reasoning\n  /effort high   - Standard reasoning (default)\n  /effort max    - Maximum reasoning\n  /effort auto   - Automatic selection\n\nShortcut: Shift+Tab cycles levels",
+                        self.reasoning_effort.display_name(),
+                    );
+                    (true, Some(msg))
+                }
             }
 
             _ => (true, Some(format!("Unknown command: /{}\nTry: /help for all commands", command))),
@@ -804,6 +916,42 @@ impl App {
                 self.status = format!("Done ({})", stop_reason);
                 self.mode = AppMode::Input;
             }
+            AgentEvent::ReasoningChunk(chunk) => {
+                if let Some(last) = self.messages.last_mut() {
+                    if last.role == "assistant" {
+                        last.content.push_str(&chunk);
+                    }
+                }
+            }
+            AgentEvent::ModeChanged { mode } => {
+                self.interaction_mode = mode;
+                self.status = format!("Mode changed to: {}", mode.display_name());
+            }
+            AgentEvent::ReasoningEffortChanged { effort } => {
+                self.reasoning_effort = effort;
+                self.status = format!("Reasoning effort: {}", effort.display_name());
+            }
+            AgentEvent::CostEstimate { estimate } => {
+                self.total_input_tokens += estimate.input_tokens;
+                self.total_output_tokens += estimate.output_tokens;
+                self.total_cost += estimate.total_cost;
+                self.session_cost += estimate.total_cost;
+            }
+            AgentEvent::Compaction { result } => {
+                let msg = format!(
+                    "Context compacted: {:.1}% reduction ({} → {} messages)",
+                    result.reduction_pct(),
+                    result.original_messages,
+                    result.compacted_messages
+                );
+                self.status = msg;
+                self.messages.push(ChatMessage {
+                    role: "system".to_string(),
+                    content: crate::core::compaction::format_compaction_result(&result),
+                    timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+                    tool_calls: Vec::new(),
+                });
+            }
             AgentEvent::Error(e) => {
                 self.status = format!("Error: {}", e);
                 self.mode = AppMode::Input;
@@ -878,6 +1026,26 @@ impl App {
         self.cached_status_dirty.set(true);
     }
 
+    /// Cycle to the next interaction mode (Plan → Agent → YOLO → Plan)
+    pub fn cycle_mode(&mut self) -> InteractionMode {
+        let new_mode = self.interaction_mode.cycle();
+        self.interaction_mode = new_mode;
+        self.agent.cycle_mode();
+        self.status = format!("Mode: {}", new_mode.display_name());
+        self.mark_status_dirty();
+        new_mode
+    }
+
+    /// Cycle to the next reasoning effort
+    pub fn cycle_reasoning_effort(&mut self) -> ReasoningEffort {
+        let new_effort = self.reasoning_effort.cycle();
+        self.reasoning_effort = new_effort;
+        self.agent.cycle_reasoning_effort();
+        self.status = format!("Reasoning: {}", new_effort.display_name());
+        self.mark_status_dirty();
+        new_effort
+    }
+
     /// Get current status line text (uses cached value when possible)
     pub fn status_text(&self) -> String {
         if !self.cached_status_dirty.get() {
@@ -891,27 +1059,14 @@ impl App {
 
     /// Compute the status text from current state (internal, no caching)
     fn compute_status_text(&self) -> String {
-        let mode_str = match self.mode {
-            AppMode::Normal => "normal",
-            AppMode::Input => {
-                if self.input_submode != InputSubmode::Normal {
-                    "mention"
-                } else {
-                    "input"
-                }
-            }
-            AppMode::Streaming => "streaming",
-            AppMode::Detail => "detail",
-            AppMode::Confirm { .. } => "confirm",
-        };
-
         let mut status = format!(
-            "🦀 tools:{} | session:{} | tokens:{}/{} | mode:{} | {}",
+            "🦀 tools:{} | session:{} | tokens:{}/{} | {} {} | {}",
             self.agent.tools().len(),
             self.agent.session().message_count(),
             crate::util::format::format_tokens(self.total_input_tokens + self.total_output_tokens),
             crate::util::format::format_tokens(128_000),
-            mode_str,
+            self.interaction_mode.indicator(),
+            self.interaction_mode.display_name(),
             self.status,
         );
 

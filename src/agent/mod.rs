@@ -11,6 +11,9 @@ pub mod r#loop;
 pub mod context;
 pub mod dispatch;
 pub mod types;
+pub mod auto_reasoning;
 
 pub use r#loop::Agent;
 pub use types::AgentType;
+pub use types::InteractionMode;
+pub use types::ReasoningEffort;

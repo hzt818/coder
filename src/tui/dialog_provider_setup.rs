@@ -166,7 +166,7 @@ fn render_provider_dialog(
     options: &[ProviderSetupChoice],
     selected: usize,
 ) {
-    let area = centered_rect(60, 50, frame.size());
+    let area = centered_rect(60, 50, frame.area());
 
     // Clear area
     frame.render_widget(Clear, area);
@@ -230,7 +230,7 @@ fn render_provider_dialog(
 }
 
 fn render_manual_key_dialog(frame: &mut Frame, input: &str) {
-    let area = centered_rect(60, 30, frame.size());
+    let area = centered_rect(60, 30, frame.area());
     frame.render_widget(Clear, area);
 
     let block = Block::default()

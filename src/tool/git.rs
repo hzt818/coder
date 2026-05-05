@@ -24,7 +24,7 @@ impl Tool for GitTool {
             "properties": {
                 "operation": {
                     "type": "string",
-                    "enum": ["status", "diff", "log", "commit", "push"],
+                    "enum": ["status", "diff", "log", "commit", "push", "blame", "branch", "show"],
                     "description": "Git operation to perform"
                 },
                 "repo_path": {
@@ -67,7 +67,10 @@ impl Tool for GitTool {
             "log" => git_log(&repo_path, &extra_args).await,
             "commit" => git_commit(&repo_path, &extra_args).await,
             "push" => git_push(&repo_path, &extra_args).await,
-            _ => ToolResult::err(format!("Unknown git operation: '{}'. Use: status, diff, log, commit, push", operation)),
+            "blame" => git_blame(&repo_path, &extra_args).await,
+            "branch" => git_branch(&repo_path, &extra_args).await,
+            "show" => git_show(&repo_path, &extra_args).await,
+            _ => ToolResult::err(format!("Unknown git operation: '{}'. Use: status, diff, log, commit, push, blame, branch, show", operation)),
         }
     }
 }
@@ -232,6 +235,115 @@ async fn git_push(repo_path: &str, args: &serde_json::Map<String, serde_json::Va
     }
 }
 
+/// Git blame
+async fn git_blame(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
+    let file = args.get("file")
+        .and_then(|f| f.as_str())
+        .unwrap_or("");
+
+    if file.is_empty() {
+        return ToolResult::err("'file' argument is required for blame");
+    }
+
+    let git_args = ["blame", "--line-porcelain", file];
+
+    let output = match run_git_command(repo_path, &git_args).await {
+        Ok(o) => o,
+        Err(e) => return ToolResult::err(format!("Failed to get git blame: {}", e)),
+    };
+
+    // For line-porcelain output, extract summary
+    let mut summary = String::new();
+    summary.push_str(&format!("Blame for file: {}\n\n", file));
+
+    // Extract key info from porcelain output
+    for line in output.lines() {
+        if line.starts_with("author ") {
+            summary.push_str(&format!("Author: {}\n", &line[7..]));
+        } else if line.starts_with("author-time ") {
+            let timestamp: i64 = line[12..].parse().unwrap_or(0);
+            let naive = chrono::DateTime::from_timestamp(timestamp, 0)
+                .map(|dt| dt.format("%Y-%m-%d").to_string())
+                .unwrap_or_default();
+            summary.push_str(&format!("Date: {}\n", naive));
+        } else if line.starts_with("summary ") {
+            summary.push_str(&format!("Summary: {}\n", &line[8..]));
+        } else if line.starts_with('\t') {
+            summary.push_str(&format!("  {}\n", line));
+        }
+    }
+
+    ToolResult::ok(summary)
+}
+
+/// Git branch operations
+async fn git_branch(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
+    let list = args.get("list")
+        .and_then(|l| l.as_bool())
+        .unwrap_or(true); // Default to listing
+
+    if list {
+        let git_args = ["branch", "--all"];
+        let output = match run_git_command(repo_path, &git_args).await {
+            Ok(o) => o,
+            Err(e) => return ToolResult::err(format!("Failed to list branches: {}", e)),
+        };
+
+        let mut result = String::from("Branches:\n");
+        result.push_str(&output);
+
+        // Show current branch
+        let current = match run_git_command(repo_path, &["branch", "--show-current"]).await {
+            Ok(b) => b.trim().to_string(),
+            Err(_) => String::new(),
+        };
+        if !current.is_empty() {
+            result.push_str(&format!("\nCurrent branch: {}", current));
+        }
+
+        ToolResult::ok(result)
+    } else {
+        let delete = args.get("delete").and_then(|d| d.as_str()).unwrap_or("");
+        let new_branch = args.get("create").and_then(|c| c.as_str()).unwrap_or("");
+
+        if !delete.is_empty() {
+            let git_args = ["branch", "-d", delete];
+            match run_git_command(repo_path, &git_args).await {
+                Ok(o) => ToolResult::ok(format!("Deleted branch '{}':\n{}", delete, o)),
+                Err(e) => ToolResult::err(format!("Failed to delete branch '{}': {}", delete, e)),
+            }
+        } else if !new_branch.is_empty() {
+            let git_args = ["branch", new_branch];
+            match run_git_command(repo_path, &git_args).await {
+                Ok(o) => ToolResult::ok(format!("Created branch '{}':\n{}", new_branch, o)),
+                Err(e) => ToolResult::err(format!("Failed to create branch '{}': {}", new_branch, e)),
+            }
+        } else {
+            ToolResult::err("Specify --delete <name> or --create <name> for branch operation")
+        }
+    }
+}
+
+/// Git show (view commit details)
+async fn git_show(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
+    let revision = args.get("revision")
+        .and_then(|r| r.as_str())
+        .unwrap_or("HEAD");
+
+    let format = args.get("format")
+        .and_then(|f| f.as_str())
+        .unwrap_or("%H%n%an%n%ae%n%ad%n%s%n%b");
+
+    let git_args = ["show", "--no-color", &format!("--format={}", format), revision];
+
+    let output = match run_git_command(repo_path, &git_args).await {
+        Ok(o) => o,
+        Err(e) => return ToolResult::err(format!("Failed to show revision '{}': {}", revision, e)),
+    };
+
+    ToolResult::ok(format!("Commit {}:\n{}", revision, output))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -254,6 +366,13 @@ mod tests {
     async fn test_git_empty_operation() {
         let tool = GitTool;
         let result = tool.execute(serde_json::json!({})).await;
+        assert!(!result.success);
+    }
+
+    #[tokio::test]
+    async fn test_git_blame_no_file() {
+        let tool = GitTool;
+        let result = tool.execute(serde_json::json!({"operation": "blame"})).await;
         assert!(!result.success);
     }
 

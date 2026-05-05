@@ -1,6 +1,7 @@
 //! Context management for agent conversations
 
 use crate::ai::Message;
+use crate::core::compaction::{self, CompactionConfig, CompactionResult};
 
 /// Manages the conversation context window
 #[derive(Debug, Clone)]
@@ -11,6 +12,8 @@ pub struct Context {
     max_tokens: u64,
     /// System prompt
     system_prompt: Option<String>,
+    /// Compaction configuration
+    compaction_config: CompactionConfig,
 }
 
 impl Context {
@@ -20,6 +23,7 @@ impl Context {
             messages: Vec::new(),
             max_tokens,
             system_prompt: None,
+            compaction_config: CompactionConfig::default(),
         }
     }
 
@@ -73,15 +77,45 @@ impl Context {
         self.messages.clear();
     }
 
-    /// Compact old messages into a summary (placeholder for future implementation)
-    pub fn compact(&mut self) {
-        if self.messages.len() > 10 {
-            // Keep last 10 messages, summarize the rest
-            // TODO: Implement actual summarization
-            let _ = &self.messages[..self.messages.len() - 10];
-            let keep = self.messages.split_off(self.messages.len() - 10);
-            self.messages = keep;
+    /// Compact old messages into a summary using intelligent compaction
+    pub fn compact(&mut self) -> Option<CompactionResult> {
+        let result = compaction::compact_messages(&self.messages, &self.compaction_config);
+        if result.summary_added {
+            // Replace messages with compacted version
+            let keep_count = self.compaction_config.keep_recent.min(self.messages.len());
+            let split_at = self.messages.len().saturating_sub(keep_count);
+            self.messages.drain(..split_at);
+            // The summary was already prepended by compact_messages
+            // We need to insert the summary message
+            self.messages.insert(0, Message::system(format!(
+                "[Prior context: {} messages compacted, ~{:.1}% reduction]",
+                result.original_messages,
+                result.reduction_pct()
+            )));
+            Some(result)
+        } else {
+            None
         }
+    }
+
+    /// Check if compaction should be triggered
+    pub fn should_compact(&self) -> bool {
+        compaction::should_compact(&self.messages, &self.compaction_config)
+    }
+
+    /// Get estimated token count
+    pub fn estimated_tokens(&self) -> usize {
+        compaction::estimate_message_tokens(&self.messages)
+    }
+
+    /// Set compaction configuration
+    pub fn set_compaction_config(&mut self, config: CompactionConfig) {
+        self.compaction_config = config;
+    }
+
+    /// Get max tokens
+    pub fn max_tokens(&self) -> u64 {
+        self.max_tokens
     }
 }
 

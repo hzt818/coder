@@ -40,6 +40,19 @@ impl OpenAIProvider {
             "stream": true,
         });
 
+        // Add reasoning effort if specified (for DeepSeek / OpenAI reasoning models)
+        if let Some(effort) = &config.reasoning_effort {
+            if !effort.is_empty() {
+                // OpenAI-compatible reasoning_effort parameter
+                body["reasoning_effort"] = serde_json::json!(effort);
+            }
+        }
+
+        // Add thinking budget if specified
+        if let Some(budget) = config.thinking_budget {
+            body["thinking_budget"] = serde_json::json!(budget);
+        }
+
         if !tools.is_empty() {
             body["tools"] = serde_json::json!(tools.iter().map(|t| {
                 serde_json::json!({
