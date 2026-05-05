@@ -1,0 +1,132 @@
+[package]
+name = "coder"
+version = "0.1.0"
+edition = "2021"
+description = "🦀 AI-powered development tool - integrating features from Claude Code and OpenCode"
+authors = ["Coder Team"]
+
+[lib]
+name = "coder"
+path = "src/lib.rs"
+
+[[bin]]
+name = "coder"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+syntect = "5.2"
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# AI Provider / HTTP
+reqwest = { version = "0.12", features = ["json", "stream", "socks"] }
+reqwest-eventsource = "0.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# LSP
+tower-lsp = "0.20"
+tower = { version = "0.5", features = ["util"] }
+dashmap = "6"
+
+# Git
+gix = "0.66"
+
+# Docker
+bollard = "0.17"
+
+# Database
+libsql = "0.6"
+
+# OAuth
+oauth2 = "5.0"
+
+# Audio
+cpal = "0.15"
+hound = "3.5"
+
+# Computer use
+enigo = "0.2"
+screenshots = "0.3"
+image = "0.25"
+
+# Web / API server
+axum = { version = "0.7", features = ["ws"] }
+
+# Telegram
+teloxide = "0.12"
+
+# MCP
+mcp-client = "0.1"
+
+# SDK exports
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+
+# Logging / Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+thiserror = "2"
+
+# Tool utilities
+glob = "0.3"
+
+# Async helpers
+futures = "0.3"
+futures-util = "0.3"
+tokio-stream = "0.1"
+
+# Errors / Validation
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = ["tui", "ai-openai", "ai-anthropic", "ai-opencode", "tools-core"]
+tui = []
+ai-openai = []
+ai-anthropic = []
+ai-google = []
+ai-opencode = []
+tools-core = []
+tools-git = []
+tools-docker = []
+tools-computer = []
+team = []
+skill = []
+subagent = []
+memory = []
+storage = []
+server = []
+mcp = []
+lsp = []
+sync = []
+voice = []
+oauth = []
+tools-oauth = []
+tools-db = []
+analytics = []
+adapters-telegram = []
+adapters-feishu = []
+adapters-slack = []
+permission = []
+computer = []
+worktree = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
