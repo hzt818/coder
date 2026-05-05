@@ -35,6 +35,19 @@ pub mod pr_attempt;
 pub mod snapshot_tool;
 pub mod github;
 pub mod ci;
+pub mod task_shell;
+pub mod diagnostics;
+pub mod run_tests;
+pub mod notification;
+pub mod schedule;
+pub mod lsp;
+pub mod finance;
+pub mod validate_data;
+pub mod recall;
+pub mod monitor;
+pub mod web_run;
+pub mod remote_trigger;
+pub mod review;
 
 // Phase 2 tools (feature-gated)
 #[cfg(feature = "tools-docker")]

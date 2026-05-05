@@ -20,6 +20,9 @@ pub struct Agent {
     mode: InteractionMode,
     /// Current reasoning effort
     reasoning_effort: ReasoningEffort,
+    /// Maximum tool-calling rounds in the ReAct loop before forced stop.
+    /// Override via CODER_MAX_TOOL_ROUNDS env var.
+    max_tool_rounds: usize,
     #[cfg(feature = "permission")]
     permission_evaluator: Option<PermissionEvaluator>,
 }
@@ -31,6 +34,11 @@ impl Agent {
         let mut context = Context::new(128_000);
         context.set_system_prompt(agent_type.system_prompt().to_string());
 
+        let max_tool_rounds = std::env::var("CODER_MAX_TOOL_ROUNDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(50);
+
         Self {
             provider,
             tools,
@@ -39,6 +47,7 @@ impl Agent {
             session: crate::session::Session::new(),
             mode: InteractionMode::default(),
             reasoning_effort: ReasoningEffort::default(),
+            max_tool_rounds,
             #[cfg(feature = "permission")]
             permission_evaluator: None,
         }
@@ -273,8 +282,19 @@ impl Agent {
             })
             .await;
 
-        // Main ReAct loop (max 10 turns to prevent infinite loops)
-        for _turn in 0..10 {
+        // Main ReAct loop (configurable max rounds to prevent infinite loops).
+        // Override via CODER_MAX_TOOL_ROUNDS env var. Default: 50.
+        let max_rounds = self.max_tool_rounds;
+        for turn in 0..max_rounds {
+            // Warn when nearing the limit
+            if turn >= max_rounds.saturating_sub(3) {
+                let remaining = max_rounds - turn;
+                tracing::warn!(
+                    "ReAct loop approaching limit: {} round(s) remaining",
+                    remaining
+                );
+            }
+
             let messages = self.context.build_request();
             let tool_defs = self.tools.tool_defs();
             let config = self.build_config(user_input);

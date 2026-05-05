@@ -2,6 +2,10 @@
 #![warn(clippy::all, clippy::pedantic)]
 
 use clap::Parser;
+use std::sync::atomic::Ordering;
+
+use coder::SHUTDOWN_REQUESTED;
+use coder::shutdown_notifier;
 
 /// 🦀 Coder - AI-powered development tool
 ///
@@ -52,12 +56,15 @@ async fn main() -> anyhow::Result<()> {
     // Set panic hook to restore terminal on panic
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
+        SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
         let _ = crossterm::terminal::disable_raw_mode();
         let _ = crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen);
         original_hook(panic_info);
     }));
 
-    // Set up signal handlers for graceful shutdown (Ctrl+C, SIGTERM)
+    // Set up signal handlers for graceful shutdown (Ctrl+C, SIGTERM).
+    // Instead of calling process::exit() directly (which races with TUI rendering),
+    // they set a flag and notify the main loop to exit cleanly.
     setup_signal_handler();
 
     let cli = Cli::parse();
@@ -70,6 +77,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize core systems
     coder::core::automation::init_automation_manager();
+    coder::core::audit::AuditLogger::init(None);
+    tracing::info!("Audit logger initialized");
 
     // Load config
     let config_path = cli.config.clone();
@@ -106,41 +115,43 @@ async fn main() -> anyhow::Result<()> {
         return run_headless_mode(&config, &cli).await;
     }
 
-    // Full TUI mode
+    // Full TUI mode — pass the shutdown notifier so the event loop can
+    // break out when SIGTERM/SIGINT arrives
     run_tui_mode(config, &cli).await
 }
 
-/// Set up signal handlers to restore terminal on Ctrl+C / SIGTERM.
+/// Set up signal handlers that set a global flag + notify the main loop.
+/// They do NOT call process::exit() directly to avoid racing with TUI rendering.
 #[cfg(unix)]
 fn setup_signal_handler() {
+    let notify = shutdown_notifier();
     tokio::spawn(async move {
         let mut term_signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
             .expect("Failed to create SIGTERM signal handler");
 
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
-                tracing::info!("Received Ctrl+C, shutting down...");
+                tracing::info!("Received Ctrl+C, shutting down gracefully...");
             }
             _ = term_signal.recv() => {
-                tracing::info!("Received SIGTERM, shutting down...");
+                tracing::info!("Received SIGTERM, shutting down gracefully...");
             }
         }
 
-        let _ = crossterm::terminal::disable_raw_mode();
-        let _ = crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen);
-        std::process::exit(130);
+        SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
+        notify.notify_waiters();
     });
 }
 
-/// Set up signal handler to restore terminal on Ctrl+C (Windows-compatible).
+/// Windows-compatible signal handler.
 #[cfg(not(unix))]
 fn setup_signal_handler() {
+    let notify = shutdown_notifier();
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.ok();
-        tracing::info!("Received Ctrl+C, shutting down...");
-        let _ = crossterm::terminal::disable_raw_mode();
-        let _ = crossterm::execute!(std::io::stdout(), crossterm::terminal::LeaveAlternateScreen);
-        std::process::exit(130);
+        tracing::info!("Received Ctrl+C, shutting down gracefully...");
+        SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
+        notify.notify_waiters();
     });
 }
 
@@ -182,7 +193,7 @@ async fn run_tui_mode(
         match result {
             ProviderSetupResult::FreeTier => {
                 tracing::info!("User selected OpenCode free tier (anonymous)");
-                config.ai.default_provider = "opencode".to_string();
+                save_opencode_config(&mut config, "")?;
             }
             ProviderSetupResult::OAuth => {
                 tracing::info!("User selected OAuth flow");
@@ -216,6 +227,7 @@ async fn run_tui_mode(
     let provider = create_provider(&config, cli)?;
     let tools = coder::tool::ToolRegistry::default();
     let mut agent = coder::agent::Agent::new(provider, tools);
+    let shutdown = shutdown_notifier();
 
     // Restore session if --session flag was provided
     if let Some(session_id) = &cli.session {
@@ -225,7 +237,6 @@ async fn run_tui_mode(
                 for msg in &session.messages {
                     agent.context_mut().add_message(msg.clone());
                 }
-                // Replace the agent's session so auto-save uses the same ID
                 *agent.session_mut() = session;
                 println!(
                     "Restored session: {} ({} messages)",
@@ -264,8 +275,15 @@ async fn run_tui_mode(
 
     let mut terminal = coder::tui::init_terminal()?;
     let mut app = coder::tui::App::new(agent, model_name, provider_name, working_dir);
-    let result = coder::tui::ui::run_app(&mut app, &mut terminal, &config.ui).await;
+    let result = coder::tui::ui::run_app(&mut app, &mut terminal, &config.ui, shutdown).await;
     coder::tui::restore_terminal()?;
+
+    // If shutdown was requested, use exit code 130 (same as SIGINT convention)
+    if SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
+        tracing::info!("Exiting due to shutdown signal (exit code 130)");
+        std::process::exit(130);
+    }
+
     result
 }
 
@@ -294,26 +312,50 @@ fn create_provider(
 fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyhow::Result<()> {
     let config_path = coder::util::path::coder_dir().join("config.toml");
 
-    let opencode_config = coder::config::ProviderConfig {
-        provider_type: "opencode".to_string(),
-        api_key: Some(key.to_string()),
-        base_url: Some("https://opencode.ai/zen/v1".to_string()),
-        ..Default::default()
-    };
-
-    config.ai.providers.insert("opencode".to_string(), opencode_config);
-    config.ai.default_provider = "opencode".to_string();
-
     if let Some(parent) = config_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let toml_str = toml::to_string(&config)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
-    std::fs::write(&config_path, toml_str)
-        .map_err(|e| anyhow::anyhow!("Failed to write config: {}", e))?;
-    tracing::info!("OpenCode API key saved to {:?}", config_path);
 
-    // Reload from the saved file so all env vars are resolved
+    let existing_content = if config_path.exists() {
+        std::fs::read_to_string(&config_path).unwrap_or_default()
+    } else {
+        String::new()
+    };
+
+    let mut root: toml::Value = existing_content
+        .parse()
+        .unwrap_or(toml::Value::Table(toml::value::Table::new()));
+
+    {
+        let ai_table = root
+            .as_table_mut()
+            .unwrap()
+            .entry("ai")
+            .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
+            .as_table_mut()
+            .unwrap();
+        ai_table.insert("default_provider".to_string(), toml::Value::String("opencode".to_string()));
+
+        let providers = ai_table
+            .entry("providers")
+            .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
+            .as_table_mut()
+            .unwrap();
+        providers.insert("opencode".to_string(), toml::Value::Table({
+            let mut p = toml::value::Table::new();
+            p.insert("provider_type".to_string(), toml::Value::String("opencode".to_string()));
+            p.insert("api_key".to_string(), toml::Value::String(key.to_string()));
+            p.insert("base_url".to_string(), toml::Value::String("https://opencode.ai/zen/v1".to_string()));
+            p
+        }));
+    }
+
+    let serialized = toml::to_string_pretty(&root)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
+    std::fs::write(&config_path, serialized)
+        .map_err(|e| anyhow::anyhow!("Failed to write config: {}", e))?;
+    tracing::info!("OpenCode config saved to {:?}", config_path);
+
     *config = coder::config::Settings::load(Some(config_path.to_str().unwrap()))?;
     Ok(())
 }

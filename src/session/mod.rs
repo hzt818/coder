@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 pub mod manager;
 pub mod history;
+pub mod search;
 
 /// A conversation session
 #[derive(Debug, Clone, Serialize, Deserialize)]

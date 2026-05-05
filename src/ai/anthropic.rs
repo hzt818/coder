@@ -58,7 +58,6 @@ impl AnthropicProvider {
             body["system"] = serde_json::json!(system_content);
         }
 
-        // Add thinking configuration if budget is specified
         if let Some(budget) = config.thinking_budget {
             body["thinking"] = serde_json::json!({
                 "type": "enabled",
@@ -76,16 +75,10 @@ impl AnthropicProvider {
 
 #[async_trait]
 impl Provider for AnthropicProvider {
-    fn name(&self) -> &str {
-        "Anthropic Claude"
-    }
-
-    fn model(&self) -> &str {
-        &self.model
-    }
+    fn name(&self) -> &str { "Anthropic Claude" }
+    fn model(&self) -> &str { &self.model }
 
     fn supports_thinking(&self) -> bool {
-        // Claude 4.x+ models (Sonnet 4.6, Opus 4.6, Haiku 4.5) all support extended thinking
         self.model.contains("claude-sonnet")
             || self.model.contains("claude-opus")
             || self.model.contains("claude-haiku")
@@ -109,7 +102,6 @@ impl Provider for AnthropicProvider {
             .header("Content-Type", "application/json")
             .json(&request_body);
 
-        // Add beta features header for extended thinking
         if config.thinking_budget.is_some() {
             request = request.header("anthropic-beta", "thinking-2025-01-01");
         }
@@ -138,7 +130,10 @@ impl Provider for AnthropicProvider {
             let mut buf: Vec<u8> = Vec::new();
             let mut current_event = String::new();
             let mut current_data = String::new();
-            let mut pending_tool_calls: HashMap<usize, PendingToolCall> = HashMap::new();
+
+            // Map: tool_use_id → PendingToolCall  AND  content_block_index → tool_use_id
+            // Using index as the primary key during accumulation, then ID for final emission.
+            let mut pending_by_index: HashMap<usize, PendingToolCall> = HashMap::new();
             let mut final_stop_reason: Option<String> = None;
             let mut final_usage: Option<Usage> = None;
 
@@ -153,7 +148,6 @@ impl Provider for AnthropicProvider {
 
                 buf.extend_from_slice(&chunk);
 
-                // Process all complete lines from the buffer
                 loop {
                     let newline_pos = match buf.iter().position(|&b| b == b'\n') {
                         Some(p) => p,
@@ -161,7 +155,7 @@ impl Provider for AnthropicProvider {
                     };
 
                     let mut line_bytes: Vec<u8> = buf.drain(..newline_pos).collect();
-                    buf.remove(0); // Remove the '\n'
+                    buf.remove(0);
                     if line_bytes.last() == Some(&b'\r') {
                         line_bytes.pop();
                     }
@@ -169,7 +163,6 @@ impl Provider for AnthropicProvider {
                     let line_str = String::from_utf8_lossy(&line_bytes);
 
                     if line_str.is_empty() {
-                        // Empty line = end of an SSE event; process accumulated data
                         if !current_data.is_empty() {
                             let data = std::mem::take(&mut current_data);
                             let _ = std::mem::take(&mut current_event);
@@ -201,7 +194,7 @@ impl Provider for AnthropicProvider {
                                                 "tool_use" => {
                                                     let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
                                                     let name = block.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                                    pending_tool_calls.insert(index, PendingToolCall { id, name, arguments_json: String::new() });
+                                                    pending_by_index.insert(index, PendingToolCall { id, name, arguments_json: String::new() });
                                                 }
                                                 "text" => {
                                                     if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
@@ -210,7 +203,17 @@ impl Provider for AnthropicProvider {
                                                         }
                                                     }
                                                 }
-                                                _ => {}
+                                                "thinking" => {
+                                                    // Extended thinking blocks: ignore content, just signal thinking state
+                                                    if let Some(text) = block.get("thinking").and_then(|v| v.as_str()) {
+                                                        if !text.is_empty() {
+                                                            let _ = tx.send(StreamEvent::TextChunk(format!("[thinking... {}]", &text[..text.len().min(40)]))).await;
+                                                        }
+                                                    }
+                                                }
+                                                _ => {
+                                                    tracing::debug!("Anthropic: unhandled content_block_start type: {}", block_type);
+                                                }
                                             }
                                         }
                                     }
@@ -226,27 +229,43 @@ impl Provider for AnthropicProvider {
                                                         }
                                                     }
                                                 }
+                                                "thinking_delta" => {
+                                                    // Thinking deltas during extended thinking; don't forward verbatim
+                                                }
                                                 "input_json_delta" => {
                                                     if let Some(partial) = delta.get("partial_json").and_then(|v| v.as_str()) {
-                                                        if let Some(pending) = pending_tool_calls.get_mut(&index) {
+                                                        if let Some(pending) = pending_by_index.get_mut(&index) {
                                                             pending.arguments_json.push_str(partial);
+                                                        } else {
+                                                            tracing::warn!("Anthropic: input_json_delta for unknown index {}", index);
                                                         }
                                                     }
                                                 }
-                                                _ => {}
+                                                _ => {
+                                                    tracing::debug!("Anthropic: unhandled content_block_delta type: {}", delta_type);
+                                                }
                                             }
                                         }
                                     }
                                     "content_block_stop" => {
                                         let index = json.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                                        if let Some(pending) = pending_tool_calls.remove(&index) {
-                                            let arguments: serde_json::Value = serde_json::from_str(&pending.arguments_json)
-                                                .unwrap_or(serde_json::json!({}));
+                                        if let Some(pending) = pending_by_index.remove(&index) {
+                                            let arguments: serde_json::Value = if pending.arguments_json.is_empty() {
+                                                serde_json::json!({})
+                                            } else {
+                                                serde_json::from_str(&pending.arguments_json)
+                                                    .unwrap_or_else(|e| {
+                                                        tracing::warn!("Anthropic: failed to parse tool arguments JSON: {}. Raw: {}", e, &pending.arguments_json[..pending.arguments_json.len().min(100)]);
+                                                        serde_json::json!({})
+                                                    })
+                                            };
                                             let _ = tx.send(StreamEvent::ToolCallStart(ToolCall {
                                                 id: pending.id,
                                                 name: pending.name,
                                                 arguments,
                                             })).await;
+                                        } else {
+                                            tracing::debug!("Anthropic: content_block_stop for non-tool index {}", index);
                                         }
                                     }
                                     "message_delta" => {
@@ -268,7 +287,9 @@ impl Provider for AnthropicProvider {
                                         }
                                     }
                                     "message_stop" | "ping" => {}
-                                    _ => {}
+                                    _ => {
+                                        tracing::debug!("Anthropic: unhandled event type: {}", msg_type);
+                                    }
                                 }
                             }
                         }
@@ -278,6 +299,17 @@ impl Provider for AnthropicProvider {
                         current_data = val.to_string();
                     }
                 }
+            }
+
+            // If there are still pending tool calls (stream ended unexpectedly), emit them
+            for (_idx, pending) in pending_by_index.drain() {
+                tracing::warn!("Anthropic: stream ended with pending tool call '{}'", pending.name);
+                let arguments: serde_json::Value = serde_json::from_str(&pending.arguments_json).unwrap_or(serde_json::json!({}));
+                let _ = tx.send(StreamEvent::ToolCallStart(ToolCall {
+                    id: pending.id,
+                    name: pending.name,
+                    arguments,
+                })).await;
             }
 
             let _ = tx.send(StreamEvent::Done {
@@ -297,7 +329,6 @@ fn messages_to_anthropic(messages: &[&Message]) -> Vec<serde_json::Value> {
         .map(|msg| {
             match msg.role {
                 crate::ai::Role::Assistant => {
-                    // Build content array preserving text + tool_use blocks
                     let content: Vec<serde_json::Value> = msg.content.iter().map(|block| {
                         match block {
                             ContentBlock::Text { text } => {
@@ -321,7 +352,6 @@ fn messages_to_anthropic(messages: &[&Message]) -> Vec<serde_json::Value> {
                     })
                 }
                 crate::ai::Role::Tool => {
-                    // Tool result: wrap in tool_result content blocks (Anthropic format)
                     let content: Vec<serde_json::Value> = msg.content.iter().map(|block| {
                         match block {
                             ContentBlock::ToolResult { tool_use_id, content } => {

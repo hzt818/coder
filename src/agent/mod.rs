@@ -12,6 +12,7 @@ pub mod context;
 pub mod dispatch;
 pub mod types;
 pub mod auto_reasoning;
+pub mod coordinator;
 
 pub use r#loop::Agent;
 pub use types::AgentType;

@@ -51,6 +51,10 @@ impl Tool for GitHubTool {
                     "type": "string",
                     "description": "Filter by state (open/closed/all)",
                     "default": "open"
+                },
+                "evidence": {
+                    "type": "string",
+                    "description": "Required for write operations: evidence supporting this action (e.g., test results, analysis summary)"
                 }
             },
             "required": ["operation"]
@@ -91,16 +95,24 @@ impl Tool for GitHubTool {
             "comment" => {
                 let number = args.get("number").and_then(|n| n.as_i64()).unwrap_or(0);
                 let body = args.get("body").and_then(|b| b.as_str()).unwrap_or("");
+                let evidence = args.get("evidence").and_then(|e| e.as_str()).unwrap_or("");
                 if number == 0 || body.is_empty() {
                     return ToolResult::err("Both 'number' and 'body' are required for comment");
+                }
+                if let Err(e) = validate_evidence("post comment", evidence) {
+                    return ToolResult::err(e);
                 }
                 github_comment(&repo, number, body)
             }
             "close_issue" => {
                 let number = args.get("number").and_then(|n| n.as_i64()).unwrap_or(0);
                 let body = args.get("body").and_then(|b| b.as_str()).unwrap_or("Closed.");
+                let evidence = args.get("evidence").and_then(|e| e.as_str()).unwrap_or("");
                 if number == 0 {
                     return ToolResult::err("Issue number is required");
+                }
+                if let Err(e) = validate_evidence("close issue", evidence) {
+                    return ToolResult::err(e);
                 }
                 github_close_issue(&repo, number, body)
             }
@@ -307,6 +319,29 @@ fn github_list_issues(repo: &str, state: &str) -> ToolResult {
     };
 
     ToolResult::ok(format!("Issues in {} (state: {}):\n\n{}", repo, state, output))
+}
+
+/// Validate that evidence is provided for write operations.
+///
+/// Evidence must be a non-empty string describing the analysis or
+/// test results that justify the write operation.
+fn validate_evidence(operation: &str, evidence: &str) -> Result<(), String> {
+    if evidence.trim().is_empty() {
+        return Err(format!(
+            "Evidence is required to '{}'. Provide a summary of the analysis, \
+            test results, or investigation that supports this action.",
+            operation
+        ));
+    }
+    if evidence.trim().len() < 15 {
+        return Err(format!(
+            "Evidence for '{}' is too short ({} chars). Provide a detailed \
+            justification with specific findings.",
+            operation,
+            evidence.trim().len()
+        ));
+    }
+    Ok(())
 }
 
 /// List open PRs

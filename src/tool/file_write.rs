@@ -45,19 +45,45 @@ impl Tool for FileWriteTool {
             .and_then(|c| c.as_str())
             .unwrap_or("");
 
-        // Path traversal protection: canonicalize and check against working directory
+        // ── Path traversal protection ──
+        // Resolve the path safely: canonicalize an existing ancestor, then
+        // append any non-existent tail components. Always use the resolved
+        // path for the actual write.
         let cwd = std::env::current_dir().unwrap_or_default();
         let requested = std::path::Path::new(path);
-        let canonical = if requested.is_absolute() {
-            std::fs::canonicalize(requested).unwrap_or_else(|_| requested.to_path_buf())
+        let resolved = if requested.is_absolute() {
+            // Walk up from the requested path until we find an existing ancestor.
+            let mut ancestor = Some(requested);
+            let mut tails: Vec<&std::path::Path> = Vec::new();
+
+            loop {
+                match ancestor {
+                    Some(p) if p.exists() => {
+                        let base = std::fs::canonicalize(p)
+                            .unwrap_or_else(|_| p.to_path_buf());
+                        let mut result = base;
+                        for comp in tails.iter().rev() {
+                            result.push(comp);
+                        }
+                        break result;
+                    }
+                    Some(p) => {
+                        tails.push(p.file_name().map(std::path::Path::new).unwrap_or(p));
+                        ancestor = p.parent();
+                    }
+                    None => {
+                        return ToolResult::err(format!("Cannot resolve path '{}'", path));
+                    }
+                }
+            }
         } else {
             cwd.join(requested)
         };
 
-        // Ensure the resolved path is within or below the working directory
-        if let Some(canonical_str) = canonical.to_str() {
+        // Verify the resolved path is within the working directory
+        if let Some(resolved_str) = resolved.to_str() {
             let cwd_str = cwd.to_string_lossy();
-            if !canonical_str.starts_with(&*cwd_str) {
+            if !resolved_str.starts_with(&*cwd_str) {
                 return ToolResult::err(format!(
                     "Path traversal blocked: '{}' resolves outside the working directory '{}'",
                     path, cwd_str
@@ -65,8 +91,8 @@ impl Tool for FileWriteTool {
             }
         }
 
-        // Ensure parent directory exists
-        if let Some(parent) = requested.parent() {
+        // Ensure parent directory exists (create if needed)
+        if let Some(parent) = resolved.parent() {
             if !parent.exists() {
                 if let Err(e) = std::fs::create_dir_all(parent) {
                     return ToolResult::err(format!("Failed to create directory '{}': {}", parent.display(), e));
@@ -74,9 +100,10 @@ impl Tool for FileWriteTool {
             }
         }
 
-        match std::fs::write(path, content) {
-            Ok(_) => ToolResult::ok(format!("Successfully wrote {} bytes to {}", content.len(), path)),
-            Err(e) => ToolResult::err(format!("Failed to write file '{}': {}", path, e)),
+        // Write to the resolved canonical path
+        match std::fs::write(&resolved, content) {
+            Ok(_) => ToolResult::ok(format!("Successfully wrote {} bytes to {}", content.len(), resolved.display())),
+            Err(e) => ToolResult::err(format!("Failed to write file '{}': {}", resolved.display(), e)),
         }
     }
 
@@ -103,7 +130,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "requires CWD-relative path or path traversal fix"]
     async fn test_file_write_success() {
         let tool = FileWriteTool;
         let tmp = tempfile::tempdir().unwrap();

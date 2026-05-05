@@ -110,6 +110,25 @@ impl Default for ToolRegistry {
         reg.register(Arc::new(task_gate::TaskGateTool));
         reg.register(Arc::new(automation_tool::AutomationTool));
         reg.register(Arc::new(pr_attempt::PrAttemptTool));
+        reg.register(Arc::new(diagnostics::DiagnosticsTool));
+        reg.register(Arc::new(run_tests::RunTestsTool));
+        reg.register(Arc::new(notification::PushNotificationTool));
+        reg.register(Arc::new(lsp::LspTool));
+        reg.register(Arc::new(finance::FinanceTool));
+        reg.register(Arc::new(validate_data::ValidateDataTool));
+        reg.register(Arc::new(recall::RecallTool));
+        reg.register(Arc::new(monitor::MonitorTool));
+        reg.register(Arc::new(web_run::WebRunTool));
+        reg.register(Arc::new(remote_trigger::RemoteTriggerTool));
+        reg.register(Arc::new(review::ReviewTool));
+        reg.register(Arc::new(schedule::CronCreate));
+        reg.register(Arc::new(schedule::CronUpdate));
+        reg.register(Arc::new(schedule::CronDelete));
+        reg.register(Arc::new(schedule::CronList));
+        reg.register(Arc::new(task_shell::TaskShellStart));
+        reg.register(Arc::new(task_shell::TaskShellWait));
+        reg.register(Arc::new(task_shell::TaskShellInteract));
+        reg.register(Arc::new(task_shell::TaskShellCancel));
 
         reg
     }

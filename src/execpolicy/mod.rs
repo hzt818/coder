@@ -7,6 +7,7 @@
 //! 4. `user` rules (lowest) - user-configured policies
 
 pub mod arity;
+pub mod network;
 
 use arity::BashArityDict;
 

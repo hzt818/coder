@@ -15,6 +15,7 @@ pub mod execpolicy;
 pub mod commands;
 pub mod i18n;
 pub mod sandbox;
+pub mod adapters;
 
 // Phase 1
 #[cfg(feature = "team")]
@@ -50,3 +51,18 @@ pub mod computer;
 #[cfg(feature = "worktree")]
 pub mod worktree;
 
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
+/// Global shutdown flag — set by OS signal handlers (SIGTERM, SIGINT) to
+/// request a clean shutdown. The TUI loop polls this flag rather than letting
+/// the signal handler call process::exit() directly (which could race with
+/// terminal rendering).
+pub static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+/// Notifier for graceful shutdown — signal handlers notify this;
+/// the TUI event loop awaits it to break out of rendering.
+pub fn shutdown_notifier() -> Arc<tokio::sync::Notify> {
+    static NOTIFIER: std::sync::OnceLock<Arc<tokio::sync::Notify>> = std::sync::OnceLock::new();
+    NOTIFIER.get_or_init(|| Arc::new(tokio::sync::Notify::new())).clone()
+}

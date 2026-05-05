@@ -1,4 +1,7 @@
 //! Grep tool - content search
+//!
+//! Tries ripgrep (`rg`) first, then falls back to `grep` (Unix) or
+//! `findstr` (Windows) if ripgrep is not installed.
 
 use async_trait::async_trait;
 use super::*;
@@ -55,42 +58,102 @@ impl Tool for GrepTool {
             .and_then(|g| g.as_str())
             .unwrap_or("");
 
-        let mut cmd = tokio::process::Command::new("rg");
-        cmd.arg("--line-number")
-            .arg("--color")
-            .arg("never")
-            .arg("--with-filename")
-            .current_dir(search_path);
+        // Try ripgrep first, fall back to grep/findstr
+        let result = try_search_rg(pattern, search_path, &file_glob).await
+            .or_else(|_| try_search_fallback(pattern, search_path, &file_glob));
 
-        if !file_glob.is_empty() {
-            cmd.arg("--glob").arg(file_glob);
+        match result {
+            Ok(output) => {
+                let line_count = output.lines().count();
+                ToolResult::ok(format!(
+                    "Found {} matches for '{}':\n{}",
+                    line_count, pattern, output
+                ))
+            }
+            Err(e) => ToolResult::err(format!("Search failed: {}", e)),
         }
-
-        cmd.arg(pattern);
-
-        let output = match cmd.output().await {
-            Ok(o) => o,
-            Err(e) => return ToolResult::err(format!("Failed to run ripgrep: {}. Is 'rg' installed?", e)),
-        };
-
-        if output.status.code() == Some(1) {
-            // No matches found
-            return ToolResult::ok(format!("No matches found for pattern '{}'", pattern));
-        }
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return ToolResult::err(format!("grep failed: {}", stderr));
-        }
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let line_count = stdout.lines().count();
-
-        ToolResult::ok(format!(
-            "Found {} matches for '{}':\n{}",
-            line_count, pattern, stdout
-        ))
     }
+}
+
+/// Try searching with ripgrep (`rg`)
+async fn try_search_rg(pattern: &str, path: &str, glob: &str) -> Result<String, String> {
+    let mut cmd = tokio::process::Command::new("rg");
+    cmd.arg("--line-number")
+        .arg("--color").arg("never")
+        .arg("--with-filename")
+        .current_dir(path);
+
+    if !glob.is_empty() {
+        cmd.arg("--glob").arg(glob);
+    }
+    cmd.arg(pattern);
+
+    let output = cmd.output().await
+        .map_err(|e| format!("Failed to run ripgrep: {}", e))?;
+
+    if output.status.code() == Some(1) {
+        // No matches — not an error, just empty
+        return Err("No matches".to_string());
+    }
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ripgrep failed: {}", stderr));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+/// Fallback: use basic `grep` (Unix) or `findstr` (Windows)
+fn try_search_fallback(pattern: &str, path: &str, glob: &str) -> Result<String, String> {
+    // Check which command is available
+    let has_grep = which("grep");
+    let has_findstr = cfg!(target_os = "windows") && which("findstr");
+
+    if has_grep {
+        let mut cmd = std::process::Command::new("grep");
+        cmd.arg("-rn").arg("--color=never").arg(pattern).arg(path);
+        if !glob.is_empty() {
+            cmd.arg(format!("--include={}", glob));
+        }
+        let output = cmd.output()
+            .map_err(|e| format!("Failed to run grep: {}", e))?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+        if output.status.code() == Some(1) {
+            return Err("No matches".to_string());
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("grep failed: {}", stderr));
+    }
+
+    if has_findstr {
+        let mut cmd = std::process::Command::new("findstr");
+        cmd.arg("/S").arg("/N").arg(pattern);
+        if !glob.is_empty() {
+            cmd.arg(format!("*.{}", glob.trim_start_matches('*')));
+        } else {
+            cmd.arg("*.*");
+        }
+        cmd.current_dir(path);
+        let output = cmd.output()
+            .map_err(|e| format!("Failed to run findstr: {}", e))?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
+
+    Err("No search tool available. Install ripgrep (rg), grep (Unix), or use a different search method.".to_string())
+}
+
+/// Quick check if a binary is available on PATH
+fn which(name: &str) -> bool {
+    std::process::Command::new(if cfg!(target_os = "windows") { "where" } else { "which" })
+        .arg(name)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

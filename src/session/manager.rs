@@ -24,6 +24,42 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Start a periodic auto-save task for a session.
+    ///
+    /// Spawns a tokio task that saves `session` every `interval_secs` seconds.
+    /// Returns a `oneshot::Sender` that can be used to stop the task.
+    pub fn start_auto_save(
+        &self,
+        session: std::sync::Arc<std::sync::Mutex<crate::session::Session>>,
+        interval_secs: u64,
+    ) -> tokio::sync::oneshot::Sender<()> {
+        let (stop_tx, mut stop_rx) = tokio::sync::oneshot::channel::<()>();
+        let save_dir = self.sessions_dir.clone();
+
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+            // Skip the immediate first tick (avoid saving before any message)
+            interval.tick().await;
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        let session = match session.lock() {
+                            Ok(s) => s.clone(),
+                            Err(_) => continue,
+                        };
+                        let path = save_dir.join(format!("{}.json", session.id));
+                        if let Ok(content) = serde_json::to_string_pretty(&session) {
+                            let _ = std::fs::write(&path, content);
+                        }
+                    }
+                    _ = &mut stop_rx => break,
+                }
+            }
+        });
+
+        stop_tx
+    }
+
     /// Load a session from disk
     pub fn load(&self, id: &str) -> anyhow::Result<Option<Session>> {
         let path = self.sessions_dir.join(format!("{}.json", id));
