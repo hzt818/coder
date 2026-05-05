@@ -220,8 +220,7 @@ mod tests {
     #[test]
     fn test_manager_empty() {
         let manager = UserCommandManager::new();
-        // May or may not have commands depending on disk state
-        // len() is always >= 0, so no assertion needed
+        assert_eq!(manager.is_empty(), manager.len() == 0);
     }
 
     #[test]
