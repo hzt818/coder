@@ -227,7 +227,7 @@ impl LspTool {
                             "hover" => {
                                 let contents = value
                                     .get("contents")
-                                    .or_else(|| value.as_object().map(|_| value));
+                                    .or_else(|| value.as_object().map(|_| &value));
                                 match contents {
                                     Some(c) => {
                                         let text = c
