@@ -65,10 +65,14 @@ impl McpClient {
             .spawn()
             .map_err(|e| anyhow::anyhow!("Failed to start MCP server '{}': {}", self.name, e))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Failed to open stdin for MCP server"))?;
 
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Failed to open stdout for MCP server"))?;
 
         let mut process_lock = self.process.lock().await;
@@ -99,20 +103,34 @@ impl McpClient {
             }
         });
         self.send_request("initialize", params).await?;
-        self.send_notification("notifications/initialized", serde_json::json!({})).await
+        self.send_notification("notifications/initialized", serde_json::json!({}))
+            .await
     }
 
     /// Discover available tools from the server.
     async fn discover_tools(&self) -> anyhow::Result<()> {
-        let response: serde_json::Value = self.send_request("tools/list", serde_json::json!({})).await?;
+        let response: serde_json::Value = self
+            .send_request("tools/list", serde_json::json!({}))
+            .await?;
 
         let mut tools = self.tools.lock().await;
         if let Some(tool_list) = response.get("tools").and_then(|t| t.as_array()) {
             for tool_val in tool_list {
                 tools.push(McpTool {
-                    name: tool_val.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string(),
-                    description: tool_val.get("description").and_then(|d| d.as_str()).unwrap_or("").to_string(),
-                    input_schema: tool_val.get("inputSchema").cloned().unwrap_or(serde_json::Value::Null),
+                    name: tool_val
+                        .get("name")
+                        .and_then(|n| n.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    description: tool_val
+                        .get("description")
+                        .and_then(|d| d.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                    input_schema: tool_val
+                        .get("inputSchema")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
                 });
             }
         }
@@ -121,7 +139,11 @@ impl McpClient {
     }
 
     /// Execute a tool on the MCP server.
-    pub async fn execute_tool(&self, name: &str, args: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+    pub async fn execute_tool(
+        &self,
+        name: &str,
+        args: serde_json::Value,
+    ) -> anyhow::Result<serde_json::Value> {
         let params = serde_json::json!({
             "name": name,
             "arguments": args,
@@ -140,7 +162,11 @@ impl McpClient {
     }
 
     /// Send a JSON-RPC request and read the response.
-    async fn send_request(&self, method: &str, params: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+    async fn send_request(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> anyhow::Result<serde_json::Value> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let request = serde_json::json!({
             "jsonrpc": "2.0",
@@ -157,7 +183,8 @@ impl McpClient {
     /// Read a JSON-RPC response with Content-Length header parsing.
     async fn read_response(&self, _expected_id: u64) -> anyhow::Result<serde_json::Value> {
         let mut stdout_lock = self.stdout.lock().await;
-        let reader = stdout_lock.as_mut()
+        let reader = stdout_lock
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("MCP server stdout not available"))?;
 
         let mut line = String::new();
@@ -166,7 +193,9 @@ impl McpClient {
         // Read headers
         loop {
             line.clear();
-            let bytes_read = reader.read_line(&mut line).await
+            let bytes_read = reader
+                .read_line(&mut line)
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to read MCP response: {}", e))?;
             if bytes_read == 0 {
                 anyhow::bail!("MCP server closed connection");
@@ -178,7 +207,9 @@ impl McpClient {
             }
             if let Some(len_str) = trimmed.strip_prefix("Content-Length:") {
                 content_length = Some(
-                    len_str.trim().parse()
+                    len_str
+                        .trim()
+                        .parse()
                         .map_err(|e| anyhow::anyhow!("Invalid Content-Length: {}", e))?,
                 );
             }
@@ -190,7 +221,9 @@ impl McpClient {
         // Read the JSON body
         let mut body = vec![0u8; len];
         use tokio::io::AsyncReadExt;
-        reader.read_exact(&mut body).await
+        reader
+            .read_exact(&mut body)
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to read MCP response body: {}", e))?;
 
         let response: serde_json::Value = serde_json::from_slice(&body)
@@ -198,7 +231,10 @@ impl McpClient {
 
         // Check for error response
         if let Some(error) = response.get("error") {
-            let msg = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
+            let msg = error
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown error");
             let code = error.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
             anyhow::bail!("MCP error ({}): {}", code, msg);
         }
@@ -208,7 +244,11 @@ impl McpClient {
     }
 
     /// Send a JSON-RPC notification (no response expected).
-    async fn send_notification(&self, method: &str, params: serde_json::Value) -> anyhow::Result<()> {
+    async fn send_notification(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> anyhow::Result<()> {
         let notification = serde_json::json!({
             "jsonrpc": "2.0",
             "method": method,
@@ -223,7 +263,8 @@ impl McpClient {
         let header = format!("Content-Length: {}\r\n\r\n", content.len());
 
         let mut stdin = self.stdin.lock().await;
-        let stdin = stdin.as_mut()
+        let stdin = stdin
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("MCP server not connected"))?;
 
         stdin.write_all(header.as_bytes()).await?;

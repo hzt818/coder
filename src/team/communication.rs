@@ -201,8 +201,14 @@ mod tests {
 
     #[test]
     fn test_message_content_variants() {
-        assert!(matches!(MessageContent::StatusRequest, MessageContent::StatusRequest));
+        assert!(matches!(
+            MessageContent::StatusRequest,
+            MessageContent::StatusRequest
+        ));
         assert!(matches!(MessageContent::Shutdown, MessageContent::Shutdown));
-        assert!(matches!(MessageContent::Text("hello".to_string()), MessageContent::Text(_)));
+        assert!(matches!(
+            MessageContent::Text("hello".to_string()),
+            MessageContent::Text(_)
+        ));
     }
 }

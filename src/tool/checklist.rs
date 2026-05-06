@@ -3,8 +3,8 @@
 //! Provides checklist_write/add/update/list tools that allow the AI
 //! to track progress on complex multi-step tasks with granular status.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::sync::Mutex;
 
 /// A single checklist item
@@ -134,17 +134,11 @@ impl Tool for ChecklistTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let action = args
-            .get("action")
-            .and_then(|a| a.as_str())
-            .unwrap_or("");
+        let action = args.get("action").and_then(|a| a.as_str()).unwrap_or("");
 
         match action {
             "write" => {
-                let goal = args
-                    .get("goal")
-                    .and_then(|g| g.as_str())
-                    .unwrap_or("");
+                let goal = args.get("goal").and_then(|g| g.as_str()).unwrap_or("");
 
                 let items: Vec<String> = args
                     .get("items")
@@ -161,7 +155,11 @@ impl Tool for ChecklistTool {
                 }
 
                 let mut state = CHECKLIST.lock().unwrap();
-                state.goal = if goal.is_empty() { None } else { Some(goal.to_string()) };
+                state.goal = if goal.is_empty() {
+                    None
+                } else {
+                    Some(goal.to_string())
+                };
 
                 let start_id = state.next_id;
                 for item_desc in &items {
@@ -234,10 +232,7 @@ impl Tool for ChecklistTool {
             }
             "update" => {
                 let id = args.get("id").and_then(|i| i.as_i64()).unwrap_or(0) as usize;
-                let status_str = args
-                    .get("status")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("");
+                let status_str = args.get("status").and_then(|s| s.as_str()).unwrap_or("");
 
                 if id == 0 {
                     return ToolResult::err("'id' is required for 'update'");
@@ -246,10 +241,7 @@ impl Tool for ChecklistTool {
                     return ToolResult::err("'status' is required for 'update'");
                 }
 
-                let details = args
-                    .get("details")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("");
+                let details = args.get("details").and_then(|d| d.as_str()).unwrap_or("");
 
                 let mut state = CHECKLIST.lock().unwrap();
                 let item = state.items.iter_mut().find(|item| item.id == id);
@@ -307,7 +299,10 @@ impl Tool for ChecklistTool {
 
                 for item in &state.items {
                     let marker = item.status.marker();
-                    output.push_str(&format!("  {} #{} - {}\n", marker, item.id, item.description));
+                    output.push_str(&format!(
+                        "  {} #{} - {}\n",
+                        marker, item.id, item.description
+                    ));
                     if let Some(details) = &item.details {
                         output.push_str(&format!("       Details: {}\n", details));
                     }
@@ -359,9 +354,7 @@ mod tests {
     #[tokio::test]
     async fn test_checklist_list() {
         let tool = ChecklistTool;
-        let result = tool
-            .execute(serde_json::json!({"action": "list"}))
-            .await;
+        let result = tool.execute(serde_json::json!({"action": "list"})).await;
         assert!(result.success);
     }
 
@@ -405,9 +398,7 @@ mod tests {
     #[tokio::test]
     async fn test_checklist_invalid_action() {
         let tool = ChecklistTool;
-        let result = tool
-            .execute(serde_json::json!({"action": "bogus"}))
-            .await;
+        let result = tool.execute(serde_json::json!({"action": "bogus"})).await;
         assert!(!result.success);
     }
 }

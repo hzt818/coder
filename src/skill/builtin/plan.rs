@@ -46,10 +46,7 @@ impl Skill for PlanSkill {
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow::anyhow!("Plan skill requires a 'goal' field"))?;
 
-        let context = input
-            .get("context")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let context = input.get("context").and_then(|v| v.as_str()).unwrap_or("");
 
         let detail_level = input
             .get("detail_level")
@@ -63,7 +60,10 @@ impl Skill for PlanSkill {
             plan.push_str(&format!("> **Context:** {}\n\n", context));
         }
 
-        plan.push_str(&format!("**Detail level:** {} | **Goal:** {}\n\n---\n\n", detail_level, goal));
+        plan.push_str(&format!(
+            "**Detail level:** {} | **Goal:** {}\n\n---\n\n",
+            detail_level, goal
+        ));
 
         // Phase 1: Analysis & Requirements
         plan.push_str("## Phase 1: Analysis & Requirements\n\n");
@@ -156,7 +156,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result["success"], true);
-        assert!(result["output"].as_str().unwrap().contains("authentication"));
+        assert!(result["output"]
+            .as_str()
+            .unwrap()
+            .contains("authentication"));
     }
 
     #[tokio::test]

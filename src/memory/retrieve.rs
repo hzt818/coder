@@ -30,7 +30,10 @@ impl MemoryRetrieval {
     pub fn search(&self, query: &str, limit: usize) -> anyhow::Result<Vec<ScoredMemory>> {
         let all = self.store.list_all()?;
         let query_lower = query.to_lowercase();
-        let terms: Vec<&str> = query_lower.split_whitespace().filter(|t| !t.is_empty()).collect();
+        let terms: Vec<&str> = query_lower
+            .split_whitespace()
+            .filter(|t| !t.is_empty())
+            .collect();
 
         if terms.is_empty() {
             return Ok(Vec::new());
@@ -48,7 +51,11 @@ impl MemoryRetrieval {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         scored.truncate(limit);
         Ok(scored)
@@ -70,7 +77,11 @@ impl MemoryRetrieval {
     }
 
     /// Search by insight type.
-    pub fn search_by_type(&self, insight_type: &str, limit: usize) -> anyhow::Result<Vec<MemoryEntry>> {
+    pub fn search_by_type(
+        &self,
+        insight_type: &str,
+        limit: usize,
+    ) -> anyhow::Result<Vec<MemoryEntry>> {
         let all = self.store.list_all()?;
         let mut results: Vec<MemoryEntry> = all
             .into_iter()
@@ -94,7 +105,10 @@ impl MemoryRetrieval {
             if content_lower.contains(term) {
                 score += 2.0;
                 // Bonus for exact word boundary
-                if content_lower.split(|c: char| !c.is_alphanumeric()).any(|w| w == *term) {
+                if content_lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|w| w == *term)
+                {
                     score += 1.0;
                 }
             }
@@ -162,17 +176,15 @@ mod tests {
     #[test]
     #[ignore = "scoring priority issue needs investigation"]
     fn test_search_by_tag() {
-        let store = create_store_with(vec![
-            MemoryEntry {
-                id: "1".into(),
-                session_id: "s1".into(),
-                content: "Some content".into(),
-                insight_type: "general".into(),
-                tags: vec!["important".into()],
-                created_at: "2026-01-01T00:00:00Z".into(),
-                updated_at: "2026-01-01T00:00:00Z".into(),
-            },
-        ]);
+        let store = create_store_with(vec![MemoryEntry {
+            id: "1".into(),
+            session_id: "s1".into(),
+            content: "Some content".into(),
+            insight_type: "general".into(),
+            tags: vec!["important".into()],
+            created_at: "2026-01-01T00:00:00Z".into(),
+            updated_at: "2026-01-01T00:00:00Z".into(),
+        }]);
 
         let retrieval = MemoryRetrieval::new(store);
         let results = retrieval.search_by_tag("important", 10).unwrap();

@@ -4,8 +4,8 @@
 use clap::Parser;
 use std::sync::atomic::Ordering;
 
-use coder::SHUTDOWN_REQUESTED;
 use coder::shutdown_notifier;
+use coder::SHUTDOWN_REQUESTED;
 
 /// 🦀 Coder - AI-powered development tool
 ///
@@ -126,8 +126,9 @@ async fn main() -> anyhow::Result<()> {
 fn setup_signal_handler() {
     let notify = shutdown_notifier();
     tokio::spawn(async move {
-        let mut term_signal = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("Failed to create SIGTERM signal handler");
+        let mut term_signal =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("Failed to create SIGTERM signal handler");
 
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {
@@ -168,10 +169,7 @@ async fn run_print_mode(
     Ok(())
 }
 
-async fn run_headless_mode(
-    config: &coder::config::Settings,
-    cli: &Cli,
-) -> anyhow::Result<()> {
+async fn run_headless_mode(config: &coder::config::Settings, cli: &Cli) -> anyhow::Result<()> {
     let provider = create_provider(config, cli)?;
     let tools = coder::tool::ToolRegistry::default();
     let agent = coder::agent::Agent::new(provider, tools);
@@ -179,10 +177,7 @@ async fn run_headless_mode(
     Ok(())
 }
 
-async fn run_tui_mode(
-    mut config: coder::config::Settings,
-    cli: &Cli,
-) -> anyhow::Result<()> {
+async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow::Result<()> {
     // Check if any provider has an API key configured; if not, show setup dialog
     let has_api_key = config.ai.providers.values().any(|p| p.api_key.is_some());
     if !has_api_key {
@@ -248,7 +243,10 @@ async fn run_tui_mode(
                 println!("Session not found: {}", session_id);
             }
             Err(e) => {
-                eprintln!("Failed to load session '{}': {}. Starting new session.", session_id, e);
+                eprintln!(
+                    "Failed to load session '{}': {}. Starting new session.",
+                    session_id, e
+                );
             }
         }
     }
@@ -334,20 +332,32 @@ fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyh
             .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
             .as_table_mut()
             .unwrap();
-        ai_table.insert("default_provider".to_string(), toml::Value::String("opencode".to_string()));
+        ai_table.insert(
+            "default_provider".to_string(),
+            toml::Value::String("opencode".to_string()),
+        );
 
         let providers = ai_table
             .entry("providers")
             .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
             .as_table_mut()
             .unwrap();
-        providers.insert("opencode".to_string(), toml::Value::Table({
-            let mut p = toml::value::Table::new();
-            p.insert("provider_type".to_string(), toml::Value::String("opencode".to_string()));
-            p.insert("api_key".to_string(), toml::Value::String(key.to_string()));
-            p.insert("base_url".to_string(), toml::Value::String("https://opencode.ai/zen/v1".to_string()));
-            p
-        }));
+        providers.insert(
+            "opencode".to_string(),
+            toml::Value::Table({
+                let mut p = toml::value::Table::new();
+                p.insert(
+                    "provider_type".to_string(),
+                    toml::Value::String("opencode".to_string()),
+                );
+                p.insert("api_key".to_string(), toml::Value::String(key.to_string()));
+                p.insert(
+                    "base_url".to_string(),
+                    toml::Value::String("https://opencode.ai/zen/v1".to_string()),
+                );
+                p
+            }),
+        );
     }
 
     let serialized = toml::to_string_pretty(&root)

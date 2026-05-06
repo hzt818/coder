@@ -3,8 +3,8 @@
 //! Parses and applies unified diff format patches with fuzzy matching support.
 //! Preferred over shell `patch` command for structured output and safety.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct ApplyPatchTool;
 
@@ -49,19 +49,14 @@ impl Tool for ApplyPatchTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let path = args.get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
 
-        let patch_str = args.get("patch")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let patch_str = args.get("patch").and_then(|p| p.as_str()).unwrap_or("");
 
-        let fuzz = args.get("fuzz")
-            .and_then(|f| f.as_u64())
-            .unwrap_or(0) as usize;
+        let fuzz = args.get("fuzz").and_then(|f| f.as_u64()).unwrap_or(0) as usize;
 
-        let reverse = args.get("reverse")
+        let reverse = args
+            .get("reverse")
             .and_then(|r| r.as_bool())
             .unwrap_or(false);
 
@@ -119,7 +114,12 @@ impl Tool for ApplyPatchTool {
                     fuzz_used = fuzz_used.max(fuzz_level);
                 }
                 Err(e) => {
-                    errors.push(format!("Hunk at lines {}-{}: {}", hunk.orig_start, hunk.orig_start + hunk.orig_lines, e));
+                    errors.push(format!(
+                        "Hunk at lines {}-{}: {}",
+                        hunk.orig_start,
+                        hunk.orig_start + hunk.orig_lines,
+                        e
+                    ));
                 }
             }
         }
@@ -145,7 +145,10 @@ impl Tool for ApplyPatchTool {
                 }
 
                 if applied < hunks.len() {
-                    output.push_str(&format!("\n{} hunk(s) failed to apply:", hunks.len() - applied));
+                    output.push_str(&format!(
+                        "\n{} hunk(s) failed to apply:",
+                        hunks.len() - applied
+                    ));
                     for err in &errors {
                         output.push_str(&format!("\n  - {}", err));
                     }
@@ -254,7 +257,10 @@ fn parse_unified_diff(diff: &str, reverse: bool) -> Result<Vec<Hunk>, String> {
 /// Parse a unified diff hunk header
 /// Format: @@ -orig_start,orig_lines +new_start,new_lines @@
 fn parse_hunk_header(header: &str) -> Option<(usize, usize, usize, usize)> {
-    let header = header.trim_start_matches("@@").trim_end_matches("@@").trim();
+    let header = header
+        .trim_start_matches("@@")
+        .trim_end_matches("@@")
+        .trim();
     let parts: Vec<&str> = header.split(' ').collect();
     if parts.len() < 2 {
         return None;
@@ -337,8 +343,7 @@ fn apply_hunk(content: &str, hunk: &Hunk, fuzz: usize) -> Result<(String, usize)
     match best_pos {
         Some(pos) => {
             let (fuzz_level, _) = verify_hunk_position(&lines, hunk, pos, fuzz)?;
-            apply_at_position(&lines, hunk, pos, total_lines)
-                .map(|(r, _)| (r, fuzz_level))
+            apply_at_position(&lines, hunk, pos, total_lines).map(|(r, _)| (r, fuzz_level))
         }
         None => {
             // Try fuzzy match with max fuzz
@@ -582,7 +587,10 @@ mod tests {
         // In reverse mode, the - becomes + and + becomes -
         assert_eq!(hunks.len(), 1);
         // The first changed line should be an Insert (was - before)
-        assert_eq!(hunks[0].lines[1], HunkLine::Insert("modified_line".to_string()));
+        assert_eq!(
+            hunks[0].lines[1],
+            HunkLine::Insert("modified_line".to_string())
+        );
     }
 
     #[test]

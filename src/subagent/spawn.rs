@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::ai::{GenerateConfig, Message, Provider};
 use crate::agent::context::Context;
+use crate::ai::{GenerateConfig, Message, Provider};
 use crate::tool::ToolRegistry;
 
 /// Configuration for spawning a subagent

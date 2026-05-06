@@ -1,8 +1,6 @@
 //! Keyboard input functionality using the `enigo` crate
 
-use enigo::{
-    Direction, Enigo, Keyboard as EnigoKeyboard, Settings,
-};
+use enigo::{Direction, Enigo, Keyboard as EnigoKeyboard, Settings};
 
 use super::{ComputerError, ComputerResult};
 

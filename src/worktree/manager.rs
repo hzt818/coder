@@ -159,7 +159,9 @@ impl WorktreeManager {
     /// Validate a worktree name
     fn validate_name(&self, name: &str) -> WorktreeResult<()> {
         if name.is_empty() {
-            return Err(WorktreeError::InvalidName("Worktree name cannot be empty".to_string()));
+            return Err(WorktreeError::InvalidName(
+                "Worktree name cannot be empty".to_string(),
+            ));
         }
         if name.contains('/') || name.contains('\\') {
             return Err(WorktreeError::InvalidName(
@@ -313,7 +315,9 @@ mod tests {
             "abc123def456"
         );
 
-        let worktrees = manager.parse_worktree_list(porcelain_output.as_bytes()).unwrap();
+        let worktrees = manager
+            .parse_worktree_list(porcelain_output.as_bytes())
+            .unwrap();
         assert_eq!(worktrees.len(), 1);
         assert_eq!(worktrees[0].branch, "main");
         assert_eq!(worktrees[0].status, WorktreeStatus::Clean);

@@ -7,53 +7,53 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-pub mod registry;
 pub mod bash;
+pub mod file_edit;
 pub mod file_read;
 pub mod file_write;
-pub mod file_edit;
 pub mod glob;
 pub mod grep;
 pub mod question;
+pub mod registry;
 
 // Phase 1+ tools (always compiled)
+pub mod apply_patch;
+pub mod automation_tool;
+pub mod checklist;
+pub mod ci;
+pub mod diagnostics;
+pub mod docs;
+pub mod fim_edit;
+pub mod finance;
 #[cfg(feature = "tools-git")]
 pub mod git;
-pub mod web_fetch;
-pub mod web_search;
-pub mod docs;
-pub mod task;
-pub mod plan;
-pub mod apply_patch;
-pub mod fim_edit;
-pub mod list_dir;
-pub mod checklist;
-pub mod rlm;
-pub mod task_gate;
-pub mod automation_tool;
-pub mod pr_attempt;
-pub mod snapshot_tool;
 pub mod github;
-pub mod ci;
-pub mod task_shell;
-pub mod diagnostics;
-pub mod run_tests;
-pub mod notification;
-pub mod schedule;
+pub mod list_dir;
 pub mod lsp;
-pub mod finance;
-pub mod validate_data;
-pub mod recall;
 pub mod monitor;
-pub mod web_run;
+pub mod notification;
+pub mod plan;
+pub mod pr_attempt;
+pub mod recall;
 pub mod remote_trigger;
 pub mod review;
+pub mod rlm;
+pub mod run_tests;
+pub mod schedule;
+pub mod snapshot_tool;
+pub mod task;
+pub mod task_gate;
+pub mod task_shell;
+pub mod validate_data;
+pub mod web_fetch;
+pub mod web_run;
+pub mod web_search;
 
 // Phase 2 tools (feature-gated)
-#[cfg(feature = "tools-docker")]
-pub mod docker;
 #[cfg(feature = "tools-db")]
 pub mod db_query;
+#[cfg(feature = "tools-docker")]
+pub mod docker;
 #[cfg(feature = "tools-oauth")]
 pub mod oauth;
 #[cfg(feature = "tools-git")]
@@ -115,7 +115,11 @@ impl ToolResult {
     }
 
     /// Apply capacity routing to truncate output if needed
-    pub fn apply_capacity(mut self, tool_name: &str, config: &crate::core::capacity::CapacityConfig) -> Self {
+    pub fn apply_capacity(
+        mut self,
+        tool_name: &str,
+        config: &crate::core::capacity::CapacityConfig,
+    ) -> Self {
         let check = crate::core::capacity::check_capacity(tool_name, &self.output, config);
         if check.truncated {
             self.original_size = self.output.len();

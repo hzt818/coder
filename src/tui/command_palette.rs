@@ -142,7 +142,9 @@ impl CommandPalette {
     /// index is out of bounds.
     pub fn execute(&self) -> Option<String> {
         let filtered = self.filter();
-        filtered.get(self.selected).map(|item| item.action.to_string())
+        filtered
+            .get(self.selected)
+            .map(|item| item.action.to_string())
     }
 
     /// Check whether a given keybinding (e.g., "Ctrl+K") is covered
@@ -259,7 +261,10 @@ mod tests {
         let names: Vec<&str> = filtered.iter().map(|item| item.name).collect();
         assert!(names.contains(&"Cost"), "Cost should match 'co'");
         assert!(names.contains(&"Compact"), "Compact should match 'co'");
-        assert!(names.contains(&"Clear"), "Clear describes 'Clear conversation' which has 'co'");
+        assert!(
+            names.contains(&"Clear"),
+            "Clear describes 'Clear conversation' which has 'co'"
+        );
         assert_eq!(filtered.len(), 3, "Cost, Compact, and Clear match 'co'");
     }
 

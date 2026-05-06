@@ -25,6 +25,9 @@ mod tests {
     #[test]
     fn test_render_template_empty_vars() {
         let vars = std::collections::HashMap::new();
-        assert_eq!(render_template("Hello, {{name}}!", &vars), "Hello, {{name}}!");
+        assert_eq!(
+            render_template("Hello, {{name}}!", &vars),
+            "Hello, {{name}}!"
+        );
     }
 }

@@ -40,8 +40,8 @@ impl SnapshotManager {
     /// Create a new snapshot manager for the given workspace
     pub fn new(workspace: &Path) -> Self {
         let snapshots_root = Self::default_snapshots_root();
-        let workspace_canonical = std::fs::canonicalize(workspace)
-            .unwrap_or_else(|_| workspace.to_path_buf());
+        let workspace_canonical =
+            std::fs::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf());
         let workspace_str = workspace_canonical.to_string_lossy().to_string();
 
         // Create deterministic hashes from workspace path
@@ -72,7 +72,9 @@ impl SnapshotManager {
 
     /// Initialize the side git repository
     pub fn init(&self) -> anyhow::Result<()> {
-        let git_dir_parent = self.git_dir.parent()
+        let git_dir_parent = self
+            .git_dir
+            .parent()
             .ok_or_else(|| anyhow::anyhow!("Invalid git dir path"))?;
         std::fs::create_dir_all(git_dir_parent)?;
 
@@ -95,8 +97,10 @@ impl SnapshotManager {
         let work_tree = &self.workspace;
         let git_args = |args: &[&str]| -> std::process::Output {
             let mut cmd = std::process::Command::new("git");
-            cmd.arg("--git-dir").arg(&self.git_dir)
-                .arg("--work-tree").arg(work_tree);
+            cmd.arg("--git-dir")
+                .arg(&self.git_dir)
+                .arg("--work-tree")
+                .arg(work_tree);
             for arg in args {
                 cmd.arg(arg);
             }
@@ -118,7 +122,10 @@ impl SnapshotManager {
             "commit",
             "--allow-empty",
             "-m",
-            &format!("Initial snapshot at {}", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")),
+            &format!(
+                "Initial snapshot at {}",
+                chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
+            ),
         ]);
 
         tracing::info!(
@@ -153,8 +160,10 @@ impl SnapshotManager {
         // Git command helper
         let run_git = |args: &[&str]| -> anyhow::Result<String> {
             let output = std::process::Command::new("git")
-                .arg("--git-dir").arg(git_dir)
-                .arg("--work-tree").arg(work_tree)
+                .arg("--git-dir")
+                .arg(git_dir)
+                .arg("--work-tree")
+                .arg(work_tree)
                 .args(args)
                 .output()
                 .map_err(|e| anyhow::anyhow!("Git command failed: {}", e))?;
@@ -213,8 +222,10 @@ impl SnapshotManager {
         let work_tree = &self.workspace;
 
         let output = std::process::Command::new("git")
-            .arg("--git-dir").arg(git_dir)
-            .arg("--work-tree").arg(work_tree)
+            .arg("--git-dir")
+            .arg(git_dir)
+            .arg("--work-tree")
+            .arg(work_tree)
             .args(["log", "--reverse", "--format=%H %s", "--max-count=100"])
             .output()
             .map_err(|e| anyhow::anyhow!("git log failed: {}", e))?;
@@ -250,8 +261,10 @@ impl SnapshotManager {
 
         // Find the commit matching the snapshot ID (partial match)
         let output = std::process::Command::new("git")
-            .arg("--git-dir").arg(git_dir)
-            .arg("--work-tree").arg(work_tree)
+            .arg("--git-dir")
+            .arg(git_dir)
+            .arg("--work-tree")
+            .arg(work_tree)
             .args(["log", "--reverse", "--format=%H %s", "--max-count=200"])
             .output()
             .map_err(|e| anyhow::anyhow!("git log failed: {}", e))?;
@@ -268,13 +281,15 @@ impl SnapshotManager {
             }
         }
 
-        let commit = target_commit
-            .ok_or_else(|| anyhow::anyhow!("Snapshot '{}' not found", snapshot_id))?;
+        let commit =
+            target_commit.ok_or_else(|| anyhow::anyhow!("Snapshot '{}' not found", snapshot_id))?;
 
         // Restore to that commit state
         let output = std::process::Command::new("git")
-            .arg("--git-dir").arg(git_dir)
-            .arg("--work-tree").arg(work_tree)
+            .arg("--git-dir")
+            .arg(git_dir)
+            .arg("--work-tree")
+            .arg(work_tree)
             .args(["checkout", "--force", &commit])
             .output()
             .map_err(|e| anyhow::anyhow!("git checkout failed: {}", e))?;
@@ -295,8 +310,10 @@ impl SnapshotManager {
         let work_tree = &self.workspace;
 
         let output = std::process::Command::new("git")
-            .arg("--git-dir").arg(git_dir)
-            .arg("--work-tree").arg(work_tree)
+            .arg("--git-dir")
+            .arg(git_dir)
+            .arg("--work-tree")
+            .arg(work_tree)
             .args(["diff", snapshot_id, "--stat"])
             .output()
             .map_err(|e| anyhow::anyhow!("git diff failed: {}", e))?;

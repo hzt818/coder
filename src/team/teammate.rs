@@ -130,10 +130,9 @@ impl Teammate {
 
     /// Send a message to this teammate. Returns an error if the channel is closed.
     pub async fn send(&self, msg: TeammateMessage) -> anyhow::Result<()> {
-        self.sender
-            .send(msg)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to send message to teammate '{}': {}", self.name, e))
+        self.sender.send(msg).await.map_err(|e| {
+            anyhow::anyhow!("Failed to send message to teammate '{}': {}", self.name, e)
+        })
     }
 
     /// Create a new teammate without spawning a listener.
@@ -189,7 +188,9 @@ mod tests {
     fn test_teammate_status_display() {
         assert_eq!(TeammateStatus::Idle.to_string(), "idle");
         assert_eq!(TeammateStatus::Busy.to_string(), "busy");
-        assert!(TeammateStatus::Error("oops".to_string()).to_string().contains("error"));
+        assert!(TeammateStatus::Error("oops".to_string())
+            .to_string()
+            .contains("error"));
     }
 
     #[tokio::test]

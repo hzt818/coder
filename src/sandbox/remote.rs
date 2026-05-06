@@ -46,14 +46,11 @@ impl SandboxBackend for RemoteSandbox {
     }
 
     async fn execute(&self, command: &str, workdir: &str, timeout_secs: u64) -> SandboxResult {
-        let mut req = self
-            .client
-            .post(&self.config.url)
-            .json(&serde_json::json!({
-                "command": command,
-                "workdir": workdir,
-                "timeout_secs": timeout_secs,
-            }));
+        let mut req = self.client.post(&self.config.url).json(&serde_json::json!({
+            "command": command,
+            "workdir": workdir,
+            "timeout_secs": timeout_secs,
+        }));
 
         if let Some(ref api_key) = self.config.api_key {
             req = req.header("Authorization", format!("Bearer {}", api_key));
@@ -76,10 +73,8 @@ impl SandboxBackend for RemoteSandbox {
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string(),
-                        exit_code: body
-                            .get("exit_code")
-                            .and_then(|v| v.as_i64())
-                            .unwrap_or(-1) as i32,
+                        exit_code: body.get("exit_code").and_then(|v| v.as_i64()).unwrap_or(-1)
+                            as i32,
                         timed_out: body
                             .get("timed_out")
                             .and_then(|v| v.as_bool())
@@ -87,10 +82,7 @@ impl SandboxBackend for RemoteSandbox {
                     },
                     Err(e) => SandboxResult {
                         stdout: String::new(),
-                        stderr: format!(
-                            "Failed to parse response (status {}): {}",
-                            status, e
-                        ),
+                        stderr: format!("Failed to parse response (status {}): {}", status, e),
                         exit_code: -1,
                         timed_out: false,
                     },
@@ -128,15 +120,15 @@ mod tests {
             Some("test-key".into()),
         );
         assert_eq!(sandbox.name(), "remote");
-        assert_eq!(sandbox.config.url, "https://sandbox.example.com/api/execute");
+        assert_eq!(
+            sandbox.config.url,
+            "https://sandbox.example.com/api/execute"
+        );
     }
 
     #[test]
     fn test_remote_sandbox_without_key() {
-        let sandbox = RemoteSandbox::new_with_key(
-            "https://sandbox.example.com/api/execute",
-            None,
-        );
+        let sandbox = RemoteSandbox::new_with_key("https://sandbox.example.com/api/execute", None);
         assert!(sandbox.config.api_key.is_none());
     }
 

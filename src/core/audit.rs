@@ -219,7 +219,10 @@ pub fn format_audit_log() -> String {
     }
 
     if lines.len() > 50 {
-        result.push_str(&format!("\n... {} total entries (showing last 50)", lines.len()));
+        result.push_str(&format!(
+            "\n... {} total entries (showing last 50)",
+            lines.len()
+        ));
     }
 
     result

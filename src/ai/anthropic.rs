@@ -1,8 +1,8 @@
 //! Anthropic Claude API provider
 
-use async_trait::async_trait;
-use super::*;
 use super::provider::{Provider, StreamHandler};
+use super::*;
+use async_trait::async_trait;
 
 /// Anthropic Claude provider
 #[derive(Debug)]
@@ -34,7 +34,12 @@ impl AnthropicProvider {
         }
     }
 
-    fn build_request(&self, messages: &[Message], tools: &[ToolDef], config: &GenerateConfig) -> serde_json::Value {
+    fn build_request(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDef],
+        config: &GenerateConfig,
+    ) -> serde_json::Value {
         let system_content = messages
             .iter()
             .filter(|m| m.role == crate::ai::Role::System)
@@ -75,8 +80,12 @@ impl AnthropicProvider {
 
 #[async_trait]
 impl Provider for AnthropicProvider {
-    fn name(&self) -> &str { "Anthropic Claude" }
-    fn model(&self) -> &str { &self.model }
+    fn name(&self) -> &str {
+        "Anthropic Claude"
+    }
+    fn model(&self) -> &str {
+        &self.model
+    }
 
     fn supports_thinking(&self) -> bool {
         self.model.contains("claude-sonnet")
@@ -98,7 +107,10 @@ impl Provider for AnthropicProvider {
         let mut request = client
             .post(format!("{}/messages", self.base_url))
             .header("x-api-key", &self.api_key)
-            .header("anthropic-version", self.api_version.as_deref().unwrap_or("2023-06-01"))
+            .header(
+                "anthropic-version",
+                self.api_version.as_deref().unwrap_or("2023-06-01"),
+            )
             .header("Content-Type", "application/json")
             .json(&request_body);
 
@@ -168,46 +180,92 @@ impl Provider for AnthropicProvider {
                             let _ = std::mem::take(&mut current_event);
 
                             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data) {
-                                let msg_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                                let msg_type =
+                                    json.get("type").and_then(|v| v.as_str()).unwrap_or("");
 
                                 match msg_type {
                                     "message_start" => {
                                         if let Some(msg) = json.get("message") {
                                             if let Some(u) = msg.get("usage") {
-                                                let inp = u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                                                let out = u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                                let inp = u
+                                                    .get("input_tokens")
+                                                    .and_then(|v| v.as_u64())
+                                                    .unwrap_or(0);
+                                                let out = u
+                                                    .get("output_tokens")
+                                                    .and_then(|v| v.as_u64())
+                                                    .unwrap_or(0);
                                                 final_usage = Some(Usage {
                                                     input_tokens: inp,
                                                     output_tokens: out,
                                                     total_tokens: inp + out,
-                                                    cache_hit_tokens: u.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                                                    cache_hit_tokens: u
+                                                        .get("cache_read_input_tokens")
+                                                        .and_then(|v| v.as_u64())
+                                                        .unwrap_or(0),
                                                     cache_miss_tokens: inp,
                                                 });
                                             }
                                         }
                                     }
                                     "content_block_start" => {
-                                        let index = json.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                                        let index =
+                                            json.get("index").and_then(|v| v.as_u64()).unwrap_or(0)
+                                                as usize;
                                         if let Some(block) = json.get("content_block") {
-                                            let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                                            let block_type = block
+                                                .get("type")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
                                             match block_type {
                                                 "tool_use" => {
-                                                    let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                                    let name = block.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                                    pending_by_index.insert(index, PendingToolCall { id, name, arguments_json: String::new() });
+                                                    let id = block
+                                                        .get("id")
+                                                        .and_then(|v| v.as_str())
+                                                        .unwrap_or("")
+                                                        .to_string();
+                                                    let name = block
+                                                        .get("name")
+                                                        .and_then(|v| v.as_str())
+                                                        .unwrap_or("")
+                                                        .to_string();
+                                                    pending_by_index.insert(
+                                                        index,
+                                                        PendingToolCall {
+                                                            id,
+                                                            name,
+                                                            arguments_json: String::new(),
+                                                        },
+                                                    );
                                                 }
                                                 "text" => {
-                                                    if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                                                    if let Some(text) =
+                                                        block.get("text").and_then(|v| v.as_str())
+                                                    {
                                                         if !text.is_empty() {
-                                                            let _ = tx.send(StreamEvent::TextChunk(text.to_string())).await;
+                                                            let _ = tx
+                                                                .send(StreamEvent::TextChunk(
+                                                                    text.to_string(),
+                                                                ))
+                                                                .await;
                                                         }
                                                     }
                                                 }
                                                 "thinking" => {
                                                     // Extended thinking blocks: ignore content, just signal thinking state
-                                                    if let Some(text) = block.get("thinking").and_then(|v| v.as_str()) {
+                                                    if let Some(text) = block
+                                                        .get("thinking")
+                                                        .and_then(|v| v.as_str())
+                                                    {
                                                         if !text.is_empty() {
-                                                            let _ = tx.send(StreamEvent::TextChunk(format!("[thinking... {}]", &text[..text.len().min(40)]))).await;
+                                                            let _ = tx
+                                                                .send(StreamEvent::TextChunk(
+                                                                    format!(
+                                                                        "[thinking... {}]",
+                                                                        &text[..text.len().min(40)]
+                                                                    ),
+                                                                ))
+                                                                .await;
                                                         }
                                                     }
                                                 }
@@ -218,14 +276,25 @@ impl Provider for AnthropicProvider {
                                         }
                                     }
                                     "content_block_delta" => {
-                                        let index = json.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                                        let index =
+                                            json.get("index").and_then(|v| v.as_u64()).unwrap_or(0)
+                                                as usize;
                                         if let Some(delta) = json.get("delta") {
-                                            let delta_type = delta.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                                            let delta_type = delta
+                                                .get("type")
+                                                .and_then(|v| v.as_str())
+                                                .unwrap_or("");
                                             match delta_type {
                                                 "text_delta" => {
-                                                    if let Some(text) = delta.get("text").and_then(|v| v.as_str()) {
+                                                    if let Some(text) =
+                                                        delta.get("text").and_then(|v| v.as_str())
+                                                    {
                                                         if !text.is_empty() {
-                                                            let _ = tx.send(StreamEvent::TextChunk(text.to_string())).await;
+                                                            let _ = tx
+                                                                .send(StreamEvent::TextChunk(
+                                                                    text.to_string(),
+                                                                ))
+                                                                .await;
                                                         }
                                                     }
                                                 }
@@ -233,9 +302,16 @@ impl Provider for AnthropicProvider {
                                                     // Thinking deltas during extended thinking; don't forward verbatim
                                                 }
                                                 "input_json_delta" => {
-                                                    if let Some(partial) = delta.get("partial_json").and_then(|v| v.as_str()) {
-                                                        if let Some(pending) = pending_by_index.get_mut(&index) {
-                                                            pending.arguments_json.push_str(partial);
+                                                    if let Some(partial) = delta
+                                                        .get("partial_json")
+                                                        .and_then(|v| v.as_str())
+                                                    {
+                                                        if let Some(pending) =
+                                                            pending_by_index.get_mut(&index)
+                                                        {
+                                                            pending
+                                                                .arguments_json
+                                                                .push_str(partial);
                                                         } else {
                                                             tracing::warn!("Anthropic: input_json_delta for unknown index {}", index);
                                                         }
@@ -248,9 +324,14 @@ impl Provider for AnthropicProvider {
                                         }
                                     }
                                     "content_block_stop" => {
-                                        let index = json.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                                        let index =
+                                            json.get("index").and_then(|v| v.as_u64()).unwrap_or(0)
+                                                as usize;
                                         if let Some(pending) = pending_by_index.remove(&index) {
-                                            let arguments: serde_json::Value = if pending.arguments_json.is_empty() {
+                                            let arguments: serde_json::Value = if pending
+                                                .arguments_json
+                                                .is_empty()
+                                            {
                                                 serde_json::json!({})
                                             } else {
                                                 serde_json::from_str(&pending.arguments_json)
@@ -259,24 +340,34 @@ impl Provider for AnthropicProvider {
                                                         serde_json::json!({})
                                                     })
                                             };
-                                            let _ = tx.send(StreamEvent::ToolCallStart(ToolCall {
-                                                id: pending.id,
-                                                name: pending.name,
-                                                arguments,
-                                            })).await;
+                                            let _ = tx
+                                                .send(StreamEvent::ToolCallStart(ToolCall {
+                                                    id: pending.id,
+                                                    name: pending.name,
+                                                    arguments,
+                                                }))
+                                                .await;
                                         } else {
                                             tracing::debug!("Anthropic: content_block_stop for non-tool index {}", index);
                                         }
                                     }
                                     "message_delta" => {
                                         if let Some(delta) = json.get("delta") {
-                                            if let Some(reason) = delta.get("stop_reason").and_then(|v| v.as_str()) {
+                                            if let Some(reason) =
+                                                delta.get("stop_reason").and_then(|v| v.as_str())
+                                            {
                                                 final_stop_reason = Some(reason.to_string());
                                             }
                                         }
                                         if let Some(u) = json.get("usage") {
-                                            let input = final_usage.as_ref().map(|u| u.input_tokens).unwrap_or(0);
-                                            let out = u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                                            let input = final_usage
+                                                .as_ref()
+                                                .map(|u| u.input_tokens)
+                                                .unwrap_or(0);
+                                            let out = u
+                                                .get("output_tokens")
+                                                .and_then(|v| v.as_u64())
+                                                .unwrap_or(0);
                                             final_usage = Some(Usage {
                                                 input_tokens: input,
                                                 output_tokens: out,
@@ -288,7 +379,10 @@ impl Provider for AnthropicProvider {
                                     }
                                     "message_stop" | "ping" => {}
                                     _ => {
-                                        tracing::debug!("Anthropic: unhandled event type: {}", msg_type);
+                                        tracing::debug!(
+                                            "Anthropic: unhandled event type: {}",
+                                            msg_type
+                                        );
                                     }
                                 }
                             }
@@ -303,19 +397,27 @@ impl Provider for AnthropicProvider {
 
             // If there are still pending tool calls (stream ended unexpectedly), emit them
             for (_idx, pending) in pending_by_index.drain() {
-                tracing::warn!("Anthropic: stream ended with pending tool call '{}'", pending.name);
-                let arguments: serde_json::Value = serde_json::from_str(&pending.arguments_json).unwrap_or(serde_json::json!({}));
-                let _ = tx.send(StreamEvent::ToolCallStart(ToolCall {
-                    id: pending.id,
-                    name: pending.name,
-                    arguments,
-                })).await;
+                tracing::warn!(
+                    "Anthropic: stream ended with pending tool call '{}'",
+                    pending.name
+                );
+                let arguments: serde_json::Value =
+                    serde_json::from_str(&pending.arguments_json).unwrap_or(serde_json::json!({}));
+                let _ = tx
+                    .send(StreamEvent::ToolCallStart(ToolCall {
+                        id: pending.id,
+                        name: pending.name,
+                        arguments,
+                    }))
+                    .await;
             }
 
-            let _ = tx.send(StreamEvent::Done {
-                stop_reason: final_stop_reason.unwrap_or_else(|| "end_turn".to_string()),
-                usage: final_usage,
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Done {
+                    stop_reason: final_stop_reason.unwrap_or_else(|| "end_turn".to_string()),
+                    usage: final_usage,
+                })
+                .await;
         });
 
         Ok(rx)
@@ -326,56 +428,63 @@ impl Provider for AnthropicProvider {
 fn messages_to_anthropic(messages: &[&Message]) -> Vec<serde_json::Value> {
     messages
         .iter()
-        .map(|msg| {
-            match msg.role {
-                crate::ai::Role::Assistant => {
-                    let content: Vec<serde_json::Value> = msg.content.iter().map(|block| {
-                        match block {
-                            ContentBlock::Text { text } => {
-                                serde_json::json!({"type": "text", "text": text})
-                            }
-                            ContentBlock::ToolUse { id, name, input } => {
-                                serde_json::json!({
-                                    "type": "tool_use",
-                                    "id": id,
-                                    "name": name,
-                                    "input": input,
-                                })
-                            }
-                            _ => serde_json::Value::Null,
+        .map(|msg| match msg.role {
+            crate::ai::Role::Assistant => {
+                let content: Vec<serde_json::Value> = msg
+                    .content
+                    .iter()
+                    .map(|block| match block {
+                        ContentBlock::Text { text } => {
+                            serde_json::json!({"type": "text", "text": text})
                         }
-                    }).filter(|v| !v.is_null()).collect();
-
-                    serde_json::json!({
-                        "role": "assistant",
-                        "content": content,
-                    })
-                }
-                crate::ai::Role::Tool => {
-                    let content: Vec<serde_json::Value> = msg.content.iter().map(|block| {
-                        match block {
-                            ContentBlock::ToolResult { tool_use_id, content } => {
-                                serde_json::json!({
-                                    "type": "tool_result",
-                                    "tool_use_id": tool_use_id,
-                                    "content": content,
-                                })
-                            }
-                            _ => serde_json::Value::Null,
+                        ContentBlock::ToolUse { id, name, input } => {
+                            serde_json::json!({
+                                "type": "tool_use",
+                                "id": id,
+                                "name": name,
+                                "input": input,
+                            })
                         }
-                    }).filter(|v| !v.is_null()).collect();
+                        _ => serde_json::Value::Null,
+                    })
+                    .filter(|v| !v.is_null())
+                    .collect();
 
-                    serde_json::json!({
-                        "role": "user",
-                        "content": content,
+                serde_json::json!({
+                    "role": "assistant",
+                    "content": content,
+                })
+            }
+            crate::ai::Role::Tool => {
+                let content: Vec<serde_json::Value> = msg
+                    .content
+                    .iter()
+                    .map(|block| match block {
+                        ContentBlock::ToolResult {
+                            tool_use_id,
+                            content,
+                        } => {
+                            serde_json::json!({
+                                "type": "tool_result",
+                                "tool_use_id": tool_use_id,
+                                "content": content,
+                            })
+                        }
+                        _ => serde_json::Value::Null,
                     })
-                }
-                _ => {
-                    serde_json::json!({
-                        "role": "user",
-                        "content": msg.text(),
-                    })
-                }
+                    .filter(|v| !v.is_null())
+                    .collect();
+
+                serde_json::json!({
+                    "role": "user",
+                    "content": content,
+                })
+            }
+            _ => {
+                serde_json::json!({
+                    "role": "user",
+                    "content": msg.text(),
+                })
             }
         })
         .collect()

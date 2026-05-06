@@ -17,18 +17,11 @@ use serde_json::{json, Value};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HookEvent {
     /// Agent response started streaming.
-    ResponseStart {
-        response_id: String,
-    },
+    ResponseStart { response_id: String },
     /// A chunk of the agent response.
-    ResponseDelta {
-        response_id: String,
-        delta: String,
-    },
+    ResponseDelta { response_id: String, delta: String },
     /// Agent response finished.
-    ResponseEnd {
-        response_id: String,
-    },
+    ResponseEnd { response_id: String },
     /// Tool call lifecycle event (call/result/error).
     ToolLifecycle {
         response_id: String,
@@ -94,8 +87,9 @@ impl JsonlHookSink {
 impl HookSink for JsonlHookSink {
     async fn emit(&self, event: &HookEvent) -> Result<()> {
         if let Some(parent) = self.path.parent() {
-            tokio::fs::create_dir_all(parent).await
-                .with_context(|| format!("failed to create hook log directory {}", parent.display()))?;
+            tokio::fs::create_dir_all(parent).await.with_context(|| {
+                format!("failed to create hook log directory {}", parent.display())
+            })?;
         }
         let mut file = tokio::fs::OpenOptions::new()
             .create(true)
@@ -106,9 +100,11 @@ impl HookSink for JsonlHookSink {
 
         let payload = serde_json::to_string(&event).context("failed to encode hook event")?;
         use tokio::io::AsyncWriteExt;
-        file.write_all(payload.as_bytes()).await
+        file.write_all(payload.as_bytes())
+            .await
             .context("failed to write hook event")?;
-        file.write_all(b"\n").await
+        file.write_all(b"\n")
+            .await
             .context("failed to write hook event newline")?;
         Ok(())
     }
@@ -245,8 +241,16 @@ mod tests {
         let path = dir.path().join("hooks.jsonl");
         let sink = JsonlHookSink::new(path.clone());
 
-        sink.emit(&HookEvent::ResponseStart { response_id: "1".into() }).await.unwrap();
-        sink.emit(&HookEvent::ResponseStart { response_id: "2".into() }).await.unwrap();
+        sink.emit(&HookEvent::ResponseStart {
+            response_id: "1".into(),
+        })
+        .await
+        .unwrap();
+        sink.emit(&HookEvent::ResponseStart {
+            response_id: "2".into(),
+        })
+        .await
+        .unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();
         assert_eq!(content.lines().filter(|l| !l.is_empty()).count(), 2);
@@ -267,15 +271,23 @@ mod tests {
         // Should not panic with multiple sinks
         d.emit(HookEvent::ResponseStart {
             response_id: "multi".into(),
-        }).await;
+        })
+        .await;
     }
 
     #[test]
     fn test_event_types_serialize_correctly() {
         let events = vec![
-            HookEvent::ResponseStart { response_id: "a".into() },
-            HookEvent::ResponseDelta { response_id: "b".into(), delta: "hello".into() },
-            HookEvent::ResponseEnd { response_id: "c".into() },
+            HookEvent::ResponseStart {
+                response_id: "a".into(),
+            },
+            HookEvent::ResponseDelta {
+                response_id: "b".into(),
+                delta: "hello".into(),
+            },
+            HookEvent::ResponseEnd {
+                response_id: "c".into(),
+            },
             HookEvent::ToolLifecycle {
                 response_id: "d".into(),
                 tool_name: "test".into(),
@@ -296,7 +308,11 @@ mod tests {
         ];
         for event in &events {
             let json = event.to_json();
-            assert!(json.get("type").is_some(), "Event {:?} missing type tag", event);
+            assert!(
+                json.get("type").is_some(),
+                "Event {:?} missing type tag",
+                event
+            );
         }
     }
 }

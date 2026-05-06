@@ -1,8 +1,6 @@
 //! Mouse control functionality using the `enigo` crate
 
-use enigo::{
-    Coordinate, Direction, Enigo, Mouse as EnigoMouse, Settings,
-};
+use enigo::{Coordinate, Direction, Enigo, Mouse as EnigoMouse, Settings};
 
 use super::{ComputerError, ComputerResult, Point};
 

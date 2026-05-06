@@ -49,7 +49,8 @@ impl Context7Client {
     /// Connect to the Context7 MCP server.
     pub async fn connect(&self) -> anyhow::Result<()> {
         tracing::info!("Connecting to Context7 MCP server at: {}", self.server_url);
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -83,18 +84,21 @@ impl Context7Client {
         let library_id = self.resolve_library_id(library).await?;
 
         // Attempt to fetch documentation via HTTP, falling back to helpful text.
-        let content = self.fetch_docs_web(library, query).await.unwrap_or_else(|_| {
-            format!(
-                "Documentation for '{}' ({}) about: {}\n\n\
+        let content = self
+            .fetch_docs_web(library, query)
+            .await
+            .unwrap_or_else(|_| {
+                format!(
+                    "Documentation for '{}' ({}) about: {}\n\n\
                  To use Context7 in production, connect to the Context7 MCP server at {}.\n\
                  The MCP integration provides:\n\
                  - Resolving library names to Context7-compatible IDs (format: /org/project)\n\
                  - Querying up-to-date documentation with code examples\n\
                  - Access to version-specific docs\n\n\
                  The server_url can point to a local or remote Context7 MCP server.",
-                library, library_id, query, self.server_url
-            )
-        });
+                    library, library_id, query, self.server_url
+                )
+            });
 
         Ok(DocResult {
             library: library.to_string(),
@@ -107,7 +111,10 @@ impl Context7Client {
     /// Attempt to fetch documentation from the web using a search.
     async fn fetch_docs_web(&self, library: &str, query: &str) -> anyhow::Result<String> {
         let search_query = urlencoding(&format!("{} {} documentation", library, query));
-        let url = format!("https://api.duckduckgo.com/?q={}&format=json&no_html=1", search_query);
+        let url = format!(
+            "https://api.duckduckgo.com/?q={}&format=json&no_html=1",
+            search_query
+        );
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
@@ -118,15 +125,12 @@ impl Context7Client {
         let body: serde_json::Value = response.json().await?;
 
         // Extract relevant text from the response
-        let abstract_text = body.get("AbstractText")
+        let abstract_text = body
+            .get("AbstractText")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let answer = body.get("Answer")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-        let heading = body.get("Heading")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let answer = body.get("Answer").and_then(|v| v.as_str()).unwrap_or("");
+        let heading = body.get("Heading").and_then(|v| v.as_str()).unwrap_or("");
 
         let mut result = format!("Documentation search for '{}': {}\n\n", library, query);
 
@@ -145,7 +149,8 @@ impl Context7Client {
             result.push_str(&format!(
                 "Search the web for '{} {}' documentation at:\n\
                  https://duckduckgo.com/?q={}",
-                library, query,
+                library,
+                query,
                 urlencoding(&format!("{} {} documentation", library, query))
             ));
         }
@@ -183,14 +188,16 @@ impl Context7Client {
 
     /// Disconnect from the Context7 server.
     pub async fn disconnect(&self) -> anyhow::Result<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 }
 
 /// Simple URL-encoding for query parameters.
 fn urlencoding(input: &str) -> String {
-    input.chars()
+    input
+        .chars()
         .map(|c| match c {
             'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
             ' ' => '+'.to_string(),
@@ -235,7 +242,10 @@ mod tests {
         let client = Context7Client::new("http://localhost:3000/mcp");
         client.connect().await.unwrap();
 
-        let result = client.query_docs("React", "useEffect cleanup").await.unwrap();
+        let result = client
+            .query_docs("React", "useEffect cleanup")
+            .await
+            .unwrap();
         assert_eq!(result.library, "React");
         assert_eq!(result.query, "useEffect cleanup");
         // Should contain some text (either fetched content or fallback help)

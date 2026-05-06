@@ -28,7 +28,12 @@ impl LspHandler {
     /// Start an LSP server for the given language.
     ///
     /// If a server for this language is already running, it is returned instead.
-    pub async fn start_server(&self, language: &str, command: &str, args: Vec<String>) -> anyhow::Result<Arc<LspClient>> {
+    pub async fn start_server(
+        &self,
+        language: &str,
+        command: &str,
+        args: Vec<String>,
+    ) -> anyhow::Result<Arc<LspClient>> {
         let servers = self.servers.read().await;
         if let Some(existing) = servers.get(language) {
             return Ok(Arc::clone(existing));
@@ -64,7 +69,9 @@ impl LspHandler {
         line: u64,
         character: u64,
     ) -> anyhow::Result<serde_json::Value> {
-        let client = self.get_client(language).await
+        let client = self
+            .get_client(language)
+            .await
             .ok_or_else(|| anyhow::anyhow!("No LSP server running for language: {}", language))?;
         client.get_completion(uri, line, character).await
     }
@@ -77,7 +84,9 @@ impl LspHandler {
         line: u64,
         character: u64,
     ) -> anyhow::Result<serde_json::Value> {
-        let client = self.get_client(language).await
+        let client = self
+            .get_client(language)
+            .await
             .ok_or_else(|| anyhow::anyhow!("No LSP server running for language: {}", language))?;
         client.get_hover(uri, line, character).await
     }
@@ -90,14 +99,18 @@ impl LspHandler {
         line: u64,
         character: u64,
     ) -> anyhow::Result<serde_json::Value> {
-        let client = self.get_client(language).await
+        let client = self
+            .get_client(language)
+            .await
             .ok_or_else(|| anyhow::anyhow!("No LSP server running for language: {}", language))?;
         client.get_definition(uri, line, character).await
     }
 
     /// Get capabilities for a language server.
     pub async fn capabilities(&self, language: &str) -> anyhow::Result<ServerCapabilities> {
-        let client = self.get_client(language).await
+        let client = self
+            .get_client(language)
+            .await
             .ok_or_else(|| anyhow::anyhow!("No LSP server running for language: {}", language))?;
         Ok(client.capabilities().await)
     }
@@ -139,8 +152,14 @@ impl Drop for LspHandler {
 pub fn default_lsp_configs() -> HashMap<&'static str, (&'static str, Vec<&'static str>)> {
     let mut map = HashMap::new();
     map.insert("rust", ("rust-analyzer", vec![]));
-    map.insert("typescript", ("typescript-language-server", vec!["--stdio"]));
-    map.insert("javascript", ("typescript-language-server", vec!["--stdio"]));
+    map.insert(
+        "typescript",
+        ("typescript-language-server", vec!["--stdio"]),
+    );
+    map.insert(
+        "javascript",
+        ("typescript-language-server", vec!["--stdio"]),
+    );
     map.insert("python", ("pyright-langserver", vec!["--stdio"]));
     map.insert("go", ("gopls", vec![]));
     map.insert("json", ("vscode-json-languageserver", vec!["--stdio"]));

@@ -1,7 +1,7 @@
 //! Glob tool - file pattern matching
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct GlobTool;
 
@@ -34,17 +34,13 @@ impl Tool for GlobTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let pattern = args.get("pattern")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let pattern = args.get("pattern").and_then(|p| p.as_str()).unwrap_or("");
 
         if pattern.is_empty() {
             return ToolResult::err("Pattern is required");
         }
 
-        let search_path = args.get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or(".");
+        let search_path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
 
         let glob_pattern = if search_path == "." {
             pattern.to_string()
@@ -104,10 +100,12 @@ mod tests {
         std::fs::write(tmp.path().join("test.rs"), "").unwrap();
         let path_str = tmp.path().to_str().unwrap();
 
-        let result = tool.execute(serde_json::json!({
-            "pattern": "**/*.rs",
-            "path": path_str
-        })).await;
+        let result = tool
+            .execute(serde_json::json!({
+                "pattern": "**/*.rs",
+                "path": path_str
+            }))
+            .await;
         assert!(result.success);
         assert!(result.output.contains("test.rs"));
     }

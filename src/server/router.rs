@@ -25,8 +25,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         // Session routes
         .route(
             "/api/sessions",
-            get(super::handler_session::list_sessions)
-                .post(super::handler_session::create_session),
+            get(super::handler_session::list_sessions).post(super::handler_session::create_session),
         )
         .route(
             "/api/sessions/{id}",
@@ -37,10 +36,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
             post(super::handler_session::chat_stream),
         )
         // Tool routes
-        .route(
-            "/api/tools",
-            get(super::handler_tools::list_tools),
-        )
+        .route("/api/tools", get(super::handler_tools::list_tools))
         .route(
             "/api/tools/{name}/exec",
             post(super::handler_tools::execute_tool),

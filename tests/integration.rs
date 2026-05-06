@@ -12,8 +12,14 @@ mod tests {
         let registry = coder::tool::ToolRegistry::default();
         assert!(registry.len() >= 7, "Should have at least 7 core tools");
         assert!(registry.get("bash").is_some(), "Should have bash tool");
-        assert!(registry.get("file_read").is_some(), "Should have file_read tool");
-        assert!(registry.get("file_write").is_some(), "Should have file_write tool");
+        assert!(
+            registry.get("file_read").is_some(),
+            "Should have file_read tool"
+        );
+        assert!(
+            registry.get("file_write").is_some(),
+            "Should have file_write tool"
+        );
         assert!(registry.get("grep").is_some(), "Should have grep tool");
         assert!(registry.get("glob").is_some(), "Should have glob tool");
     }
@@ -25,9 +31,17 @@ mod tests {
         let defs = registry.tool_defs();
         for def in &defs {
             assert!(!def.name.is_empty(), "Tool name should not be empty");
-            assert!(!def.description.is_empty(), "Tool {} has no description", def.name);
-            assert!(def.input_schema.get("properties").is_some() || def.input_schema.get("type").is_some(),
-                "Tool {} schema should have properties or type", def.name);
+            assert!(
+                !def.description.is_empty(),
+                "Tool {} has no description",
+                def.name
+            );
+            assert!(
+                def.input_schema.get("properties").is_some()
+                    || def.input_schema.get("type").is_some(),
+                "Tool {} schema should have properties or type",
+                def.name
+            );
         }
     }
 
@@ -45,7 +59,11 @@ mod tests {
     fn test_session_creation() {
         let session = coder::session::Session::new();
         assert!(!session.id.is_empty(), "Session ID should not be empty");
-        assert_eq!(session.messages.len(), 0, "New session should have no messages");
+        assert_eq!(
+            session.messages.len(),
+            0,
+            "New session should have no messages"
+        );
     }
 
     // Test 5: Session add message
@@ -114,7 +132,10 @@ mod tests {
         let provider = coder::ai::create_provider("test", config, None).unwrap();
         let tools = coder::tool::ToolRegistry::default();
         let agent = coder::agent::Agent::new(provider, tools);
-        assert!(agent.tools().len() >= 7, "Agent should have at least 7 tools");
+        assert!(
+            agent.tools().len() >= 7,
+            "Agent should have at least 7 tools"
+        );
     }
 
     // Test 10: Config environment variable resolution
@@ -155,11 +176,9 @@ mod tests {
     #[test]
     fn test_tool_execution_bash() {
         let registry = coder::tool::ToolRegistry::default();
-        let result = block_on(
-            registry.get("bash").unwrap().execute(serde_json::json!({
-                "command": "echo hello"
-            }))
-        );
+        let result = block_on(registry.get("bash").unwrap().execute(serde_json::json!({
+            "command": "echo hello"
+        })));
         assert!(result.success, "Bash echo should succeed");
         assert!(result.output.contains("hello"), "Should contain 'hello'");
     }
@@ -169,9 +188,12 @@ mod tests {
     fn test_tool_execution_file_read_error() {
         let registry = coder::tool::ToolRegistry::default();
         let result = block_on(
-            registry.get("file_read").unwrap().execute(serde_json::json!({
-                "path": "/nonexistent/file.txt"
-            }))
+            registry
+                .get("file_read")
+                .unwrap()
+                .execute(serde_json::json!({
+                    "path": "/nonexistent/file.txt"
+                })),
         );
         assert!(!result.success, "Reading nonexistent file should fail");
     }
@@ -184,8 +206,16 @@ mod tests {
         assert!(defs.len() >= 10, "Should have at least 10 registered tools");
         for def in &defs {
             assert!(!def.name.is_empty(), "Tool name should not be empty");
-            assert!(!def.description.is_empty(), "Tool {} has no description", def.name);
-            assert!(def.input_schema.is_object(), "Tool {} schema should be an object", def.name);
+            assert!(
+                !def.description.is_empty(),
+                "Tool {} has no description",
+                def.name
+            );
+            assert!(
+                def.input_schema.is_object(),
+                "Tool {} schema should be an object",
+                def.name
+            );
         }
     }
 
@@ -227,14 +257,20 @@ mod tests {
 
         // Verify it appears in the list
         let list = manager.list().unwrap();
-        assert!(list.iter().any(|s| s.id == session.id), "Session should be in list after save");
+        assert!(
+            list.iter().any(|s| s.id == session.id),
+            "Session should be in list after save"
+        );
 
         // Delete
         manager.delete(&session.id).unwrap();
 
         // Verify it is gone
         let list = manager.list().unwrap();
-        assert!(!list.iter().any(|s| s.id == session.id), "Session should not be in list after delete");
+        assert!(
+            !list.iter().any(|s| s.id == session.id),
+            "Session should not be in list after delete"
+        );
     }
 
     // Test 19: Config load from file
@@ -242,7 +278,9 @@ mod tests {
     fn test_config_load_from_file() {
         let tmp = tempfile::tempdir().unwrap();
         let config_path = tmp.path().join("coder.toml");
-        std::fs::write(&config_path, r#"
+        std::fs::write(
+            &config_path,
+            r#"
 [ai]
 default_provider = "test-provider"
 
@@ -250,7 +288,9 @@ default_provider = "test-provider"
 type = "openai"
 api_key = "test-key"
 model = "gpt-4o"
-"#).unwrap();
+"#,
+        )
+        .unwrap();
 
         let settings = coder::config::Settings::load(Some(config_path.to_str().unwrap())).unwrap();
         assert_eq!(settings.ai.default_provider, "test-provider");
@@ -269,7 +309,10 @@ model = "gpt-4o"
         let provider = coder::ai::create_provider("test", config, None).unwrap();
         let tools = coder::tool::ToolRegistry::default();
         let agent = coder::agent::Agent::new(provider, tools);
-        assert!(agent.tools().len() >= 10, "Agent should have at least 10 tools");
+        assert!(
+            agent.tools().len() >= 10,
+            "Agent should have at least 10 tools"
+        );
         assert_eq!(agent.agent_type().to_string(), "coding");
     }
 
@@ -278,9 +321,21 @@ model = "gpt-4o"
     fn test_multiple_provider_types() {
         let providers = vec![
             ("openai", "https://api.openai.com/v1", "gpt-4o"),
-            ("anthropic", "https://api.anthropic.com/v1", "claude-sonnet-4-6"),
-            ("opencode", "https://opencode.ai/zen/v1", "claude-sonnet-4-6"),
-            ("google", "https://generativelanguage.googleapis.com", "gemini-2.0-flash"),
+            (
+                "anthropic",
+                "https://api.anthropic.com/v1",
+                "claude-sonnet-4-6",
+            ),
+            (
+                "opencode",
+                "https://opencode.ai/zen/v1",
+                "claude-sonnet-4-6",
+            ),
+            (
+                "google",
+                "https://generativelanguage.googleapis.com",
+                "gemini-2.0-flash",
+            ),
         ];
         for (provider_type, base_url, model) in providers {
             let config = coder::config::ProviderConfig {
@@ -291,7 +346,11 @@ model = "gpt-4o"
                 ..Default::default()
             };
             let provider = coder::ai::create_provider("test", config, None);
-            assert!(provider.is_ok(), "Provider type '{}' should be created", provider_type);
+            assert!(
+                provider.is_ok(),
+                "Provider type '{}' should be created",
+                provider_type
+            );
         }
     }
 }

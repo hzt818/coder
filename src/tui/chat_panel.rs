@@ -1,10 +1,10 @@
 //! Chat panel - renders the conversation history
 
+use super::app::ChatMessage;
+use super::syntax::highlight_code_block;
+use super::theme::AppTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
-use super::app::ChatMessage;
-use super::theme::AppTheme;
-use super::syntax::highlight_code_block;
 
 /// Parse content and yield either plain lines or code block lines
 fn parse_content<'a>(content: &'a str) -> Vec<ContentLine<'a>> {
@@ -22,7 +22,8 @@ fn parse_content<'a>(content: &'a str) -> Vec<ContentLine<'a>> {
                 code_lines.clear();
             } else {
                 // End of code block - highlight and add
-                let highlighted = highlight_code_block(&code_language, &code_lines, &AppTheme::default());
+                let highlighted =
+                    highlight_code_block(&code_language, &code_lines, &AppTheme::default());
                 for hline in highlighted {
                     result.push(ContentLine::Highlighted(hline));
                 }
@@ -58,7 +59,15 @@ enum ContentLine<'a> {
 }
 
 /// Render the chat panel
-pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offset: usize, working_dir: &str, git_branch: Option<&str>, theme: &AppTheme) {
+pub fn render_chat(
+    frame: &mut Frame,
+    area: Rect,
+    messages: &[ChatMessage],
+    offset: usize,
+    working_dir: &str,
+    git_branch: Option<&str>,
+    theme: &AppTheme,
+) {
     let mut lines: Vec<Line> = Vec::new();
 
     for msg in messages {
@@ -70,12 +79,10 @@ pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offs
             _ => ("●", theme.fg),
         };
 
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!(" {} · {} ", role_label, msg.timestamp),
-                Style::default().fg(role_color).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!(" {} · {} ", role_label, msg.timestamp),
+            Style::default().fg(role_color).add_modifier(Modifier::BOLD),
+        )]));
 
         // Content - parse for code blocks and render accordingly
         let content_lines = parse_content(&msg.content);
@@ -111,12 +118,10 @@ pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offs
                 _ => theme.fg,
             };
 
-            lines.push(Line::from(vec![
-                Span::styled(
-                    format!(" ┌─ {} {} ", status_icon, tc.tool_name),
-                    Style::default().fg(theme.tool).add_modifier(Modifier::BOLD),
-                ),
-            ]));
+            lines.push(Line::from(vec![Span::styled(
+                format!(" ┌─ {} {} ", status_icon, tc.tool_name),
+                Style::default().fg(theme.tool).add_modifier(Modifier::BOLD),
+            )]));
             for out_line in tc.output.lines() {
                 lines.push(Line::from(Span::styled(
                     format!(" │ {}", out_line),
@@ -135,12 +140,12 @@ pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offs
 
     if lines.is_empty() {
         // Welcome title
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!(" 🦀 Coder v{}", env!("CARGO_PKG_VERSION")),
-                Style::default().fg(theme.accent).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            format!(" 🦀 Coder v{}", env!("CARGO_PKG_VERSION")),
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        )]));
         lines.push(Line::from(""));
 
         // Working directory
@@ -161,12 +166,10 @@ pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offs
         lines.push(Line::from(""));
 
         // Quick actions header
-        lines.push(Line::from(vec![
-            Span::styled(
-                " Quick actions:",
-                Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            " Quick actions:",
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
+        )]));
         lines.push(Line::from(vec![
             Span::styled("   /help     ", Style::default().fg(theme.tool)),
             Span::styled("Show all commands     ", Style::default().fg(theme.dim)),
@@ -185,12 +188,10 @@ pub fn render_chat(frame: &mut Frame, area: Rect, messages: &[ChatMessage], offs
         ]));
 
         lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::styled(
-                " Type a message to start coding.",
-                Style::default().fg(theme.dim),
-            ),
-        ]));
+        lines.push(Line::from(vec![Span::styled(
+            " Type a message to start coding.",
+            Style::default().fg(theme.dim),
+        )]));
     }
 
     let chat_paragraph = Paragraph::new(lines)

@@ -22,8 +22,8 @@ pub struct CapacityConfig {
 impl Default for CapacityConfig {
     fn default() -> Self {
         Self {
-            max_output_bytes: 1_000_000,  // 1 MB
-            max_output_tokens: 50_000,     // 50K tokens
+            max_output_bytes: 1_000_000, // 1 MB
+            max_output_tokens: 50_000,   // 50K tokens
             per_tool_thresholds: HashMap::new(),
             show_truncation_banner: true,
         }
@@ -44,11 +44,7 @@ pub struct CapacityCheck {
 }
 
 /// Check tool output against capacity limits and truncate if needed
-pub fn check_capacity(
-    tool_name: &str,
-    output: &str,
-    config: &CapacityConfig,
-) -> CapacityCheck {
+pub fn check_capacity(tool_name: &str, output: &str, config: &CapacityConfig) -> CapacityCheck {
     let estimated_tokens = crate::core::pricing::estimate_tokens(output);
     let original_size = output.len();
 
@@ -78,7 +74,12 @@ pub fn check_capacity(
 }
 
 /// Truncate tool output with a summary banner
-pub fn truncate_output(output: &str, max_bytes: usize, max_tokens: usize, tool_name: &str) -> String {
+pub fn truncate_output(
+    output: &str,
+    max_bytes: usize,
+    max_tokens: usize,
+    tool_name: &str,
+) -> String {
     let estimated_tokens = crate::core::pricing::estimate_tokens(output);
     let original_size = output.len();
 
@@ -175,13 +176,15 @@ pub fn route_large_output(
         return (output.to_string(), None);
     }
 
-    let preview = truncate_output(output, config.max_output_bytes, config.max_output_tokens, tool_name);
+    let preview = truncate_output(
+        output,
+        config.max_output_bytes,
+        config.max_output_tokens,
+        tool_name,
+    );
     let spillover_id = format!("{}-spillover-{}", tool_name, uuid::Uuid::new_v4());
 
-    (
-        preview,
-        Some(spillover_id),
-    )
+    (preview, Some(spillover_id))
 }
 
 #[cfg(test)]
@@ -202,7 +205,11 @@ mod tests {
             max_output_tokens: 2,
             ..Default::default()
         };
-        let result = check_capacity("bash", "this is a very long output that should be truncated", &config);
+        let result = check_capacity(
+            "bash",
+            "this is a very long output that should be truncated",
+            &config,
+        );
         // Will be truncated due to byte limit
         assert!(result.truncated || !result.truncated);
     }
@@ -233,7 +240,11 @@ mod tests {
         let line = "This is a fairly long line of text that will be repeated many times to build up a large enough output.\n";
         let long_text: String = (0..300).map(|i| format!("line {}: {}", i, line)).collect();
         let result = summarize_for_context(&long_text, "test");
-        assert!(result.contains("[test output:"), "Summary should start with [test output:...], got first 200 chars: {}", &result[..result.len().min(200)]);
+        assert!(
+            result.contains("[test output:"),
+            "Summary should start with [test output:...], got first 200 chars: {}",
+            &result[..result.len().min(200)]
+        );
         assert!(result.contains("line 0:"), "Should contain first line");
     }
 
@@ -268,6 +279,9 @@ mod tests {
         let config = CapacityConfig::default();
         let check = check_capacity("bash", "test", &config);
         assert!(!check.truncated);
-        assert_eq!(check.estimated_tokens, crate::core::pricing::estimate_tokens("test"));
+        assert_eq!(
+            check.estimated_tokens,
+            crate::core::pricing::estimate_tokens("test")
+        );
     }
 }

@@ -3,9 +3,9 @@
 //! Provides create/list/read/update/pause/resume/delete/run operations
 //! for scheduling and managing automated prompts on a cron schedule.
 
-use async_trait::async_trait;
 use super::*;
 use crate::core::automation::{AutomationManager, AutomationStatus};
+use async_trait::async_trait;
 use std::sync::Mutex;
 
 static AUTO_MGR: Mutex<Option<AutomationManager>> = Mutex::new(None);
@@ -82,10 +82,7 @@ impl Tool for AutomationTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let op = args
-            .get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let op = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
         let mut guard = get_manager();
         let mgr = guard.as_mut().unwrap();
@@ -272,9 +269,7 @@ mod tests {
     #[tokio::test]
     async fn test_automation_list() {
         let tool = AutomationTool;
-        let result = tool
-            .execute(serde_json::json!({"operation": "list"}))
-            .await;
+        let result = tool.execute(serde_json::json!({"operation": "list"})).await;
         assert!(result.success);
     }
 
@@ -282,10 +277,12 @@ mod tests {
     async fn test_automation_read() {
         let tool = AutomationTool;
         // First create
-        let _ = tool.execute(serde_json::json!({
-            "operation": "create", "name": "read-test",
-            "schedule": "0 9 * * *", "prompt": "test"
-        })).await;
+        let _ = tool
+            .execute(serde_json::json!({
+                "operation": "create", "name": "read-test",
+                "schedule": "0 9 * * *", "prompt": "test"
+            }))
+            .await;
         let result = tool
             .execute(serde_json::json!({"operation": "read", "id": "read-test"}))
             .await;
@@ -306,10 +303,12 @@ mod tests {
     async fn test_automation_update() {
         let tool = AutomationTool;
         // First create
-        let _ = tool.execute(serde_json::json!({
-            "operation": "create", "name": "update-test",
-            "schedule": "0 9 * * *", "prompt": "test"
-        })).await;
+        let _ = tool
+            .execute(serde_json::json!({
+                "operation": "create", "name": "update-test",
+                "schedule": "0 9 * * *", "prompt": "test"
+            }))
+            .await;
         let result = tool
             .execute(serde_json::json!({
                 "operation": "update",
@@ -325,10 +324,12 @@ mod tests {
     async fn test_automation_pause_resume_delete() {
         let tool = AutomationTool;
         // Create first
-        let _ = tool.execute(serde_json::json!({
-            "operation": "create", "name": "prd-test",
-            "schedule": "0 9 * * *", "prompt": "test"
-        })).await;
+        let _ = tool
+            .execute(serde_json::json!({
+                "operation": "create", "name": "prd-test",
+                "schedule": "0 9 * * *", "prompt": "test"
+            }))
+            .await;
 
         // Pause
         let result = tool
@@ -384,9 +385,7 @@ mod tests {
     #[tokio::test]
     async fn test_automation_empty_args() {
         let tool = AutomationTool;
-        let result = tool
-            .execute(serde_json::json!({}))
-            .await;
+        let result = tool.execute(serde_json::json!({})).await;
         assert!(!result.success);
     }
 }

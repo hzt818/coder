@@ -1,7 +1,7 @@
 pub mod translations;
 
-use translations::{Locale, MessageId};
 use std::sync::OnceLock;
+use translations::{Locale, MessageId};
 
 static CURRENT_LOCALE: OnceLock<Locale> = OnceLock::new();
 

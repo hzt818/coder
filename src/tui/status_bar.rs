@@ -1,8 +1,8 @@
 //! Status bar widget
 
+use super::theme::AppTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
-use super::theme::AppTheme;
 
 /// Render the status bar
 pub fn render_status_bar(frame: &mut Frame, area: Rect, status_text: &str, theme: &AppTheme) {

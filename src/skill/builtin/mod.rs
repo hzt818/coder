@@ -5,8 +5,8 @@
 
 pub mod brainstorm;
 pub mod code_review;
-pub mod plan;
 pub mod debug;
+pub mod plan;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

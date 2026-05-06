@@ -51,12 +51,7 @@ impl ProviderSetupChoice {
     }
 
     pub fn all() -> &'static [ProviderSetupChoice] {
-        &[
-            Self::FreeTier,
-            Self::OAuth,
-            Self::Manual,
-            Self::Skip,
-        ]
+        &[Self::FreeTier, Self::OAuth, Self::Manual, Self::Skip]
     }
 }
 
@@ -161,11 +156,7 @@ pub fn run_provider_setup_dialog() -> ProviderSetupResult {
     result
 }
 
-fn render_provider_dialog(
-    frame: &mut Frame,
-    options: &[ProviderSetupChoice],
-    selected: usize,
-) {
+fn render_provider_dialog(frame: &mut Frame, options: &[ProviderSetupChoice], selected: usize) {
     let area = centered_rect(60, 50, frame.area());
 
     // Clear area
@@ -219,12 +210,7 @@ fn render_provider_dialog(
     .alignment(Alignment::Center)
     .style(Style::default().fg(Color::DarkGray));
 
-    let instr_area = Rect::new(
-        area.x,
-        area.y + area.height - 3,
-        area.width,
-        3,
-    );
+    let instr_area = Rect::new(area.x, area.y + area.height - 3, area.width, 3);
     frame.render_widget(Clear, instr_area);
     frame.render_widget(instructions, instr_area);
 }

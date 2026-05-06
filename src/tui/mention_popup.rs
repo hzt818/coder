@@ -1,9 +1,9 @@
 //! Mention autocomplete popup - shown when user types @
 
-use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState};
 use super::app::InputSubmode;
 use super::theme::AppTheme;
+use ratatui::prelude::*;
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState};
 
 /// Render the @ mention autocomplete popup
 pub fn render_mention_popup(

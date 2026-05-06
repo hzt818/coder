@@ -49,9 +49,7 @@ impl AudioOutput {
             .output_devices()
             .map_err(|e| VoiceError::AudioOutput(format!("Failed to list output devices: {e}")))?;
 
-        let names: Vec<String> = devices
-            .filter_map(|d| d.name().ok())
-            .collect();
+        let names: Vec<String> = devices.filter_map(|d| d.name().ok()).collect();
 
         Ok(names)
     }
@@ -164,10 +162,13 @@ impl AudioOutput {
             devices
                 .into_iter()
                 .find(|d| d.name().map(|n| n == *name).unwrap_or(false))
-                .ok_or_else(|| VoiceError::DeviceNotFound(format!("Output device '{name}' not found")))
+                .ok_or_else(|| {
+                    VoiceError::DeviceNotFound(format!("Output device '{name}' not found"))
+                })
         } else {
-            host.default_output_device()
-                .ok_or_else(|| VoiceError::DeviceNotFound("No default output device found".to_string()))
+            host.default_output_device().ok_or_else(|| {
+                VoiceError::DeviceNotFound("No default output device found".to_string())
+            })
         }
     }
 }

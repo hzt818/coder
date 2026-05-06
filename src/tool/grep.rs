@@ -3,8 +3,8 @@
 //! Tries ripgrep (`rg`) first, then falls back to `grep` (Unix) or
 //! `findstr` (Windows) if ripgrep is not installed.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct GrepTool;
 
@@ -42,24 +42,19 @@ impl Tool for GrepTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let pattern = args.get("pattern")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let pattern = args.get("pattern").and_then(|p| p.as_str()).unwrap_or("");
 
         if pattern.is_empty() {
             return ToolResult::err("Pattern is required");
         }
 
-        let search_path = args.get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or(".");
+        let search_path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
 
-        let file_glob = args.get("glob")
-            .and_then(|g| g.as_str())
-            .unwrap_or("");
+        let file_glob = args.get("glob").and_then(|g| g.as_str()).unwrap_or("");
 
         // Try ripgrep first, fall back to grep/findstr
-        let result = try_search_rg(pattern, search_path, &file_glob).await
+        let result = try_search_rg(pattern, search_path, &file_glob)
+            .await
             .or_else(|_| try_search_fallback(pattern, search_path, &file_glob));
 
         match result {
@@ -79,7 +74,8 @@ impl Tool for GrepTool {
 async fn try_search_rg(pattern: &str, path: &str, glob: &str) -> Result<String, String> {
     let mut cmd = tokio::process::Command::new("rg");
     cmd.arg("--line-number")
-        .arg("--color").arg("never")
+        .arg("--color")
+        .arg("never")
         .arg("--with-filename")
         .current_dir(path);
 
@@ -88,7 +84,9 @@ async fn try_search_rg(pattern: &str, path: &str, glob: &str) -> Result<String, 
     }
     cmd.arg(pattern);
 
-    let output = cmd.output().await
+    let output = cmd
+        .output()
+        .await
         .map_err(|e| format!("Failed to run ripgrep: {}", e))?;
 
     if output.status.code() == Some(1) {
@@ -115,7 +113,8 @@ fn try_search_fallback(pattern: &str, path: &str, glob: &str) -> Result<String, 
         if !glob.is_empty() {
             cmd.arg(format!("--include={}", glob));
         }
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .map_err(|e| format!("Failed to run grep: {}", e))?;
         if output.status.success() {
             return Ok(String::from_utf8_lossy(&output.stdout).to_string());
@@ -136,7 +135,8 @@ fn try_search_fallback(pattern: &str, path: &str, glob: &str) -> Result<String, 
             cmd.arg("*.*");
         }
         cmd.current_dir(path);
-        let output = cmd.output()
+        let output = cmd
+            .output()
             .map_err(|e| format!("Failed to run findstr: {}", e))?;
         if output.status.success() {
             return Ok(String::from_utf8_lossy(&output.stdout).to_string());
@@ -149,11 +149,15 @@ fn try_search_fallback(pattern: &str, path: &str, glob: &str) -> Result<String, 
 
 /// Quick check if a binary is available on PATH
 fn which(name: &str) -> bool {
-    std::process::Command::new(if cfg!(target_os = "windows") { "where" } else { "which" })
-        .arg(name)
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    std::process::Command::new(if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    })
+    .arg(name)
+    .output()
+    .map(|o| o.status.success())
+    .unwrap_or(false)
 }
 
 #[cfg(test)]

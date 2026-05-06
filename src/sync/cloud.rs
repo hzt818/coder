@@ -114,7 +114,9 @@ impl CloudSync {
             .map_err(|e| SyncError::Serialization(format!("Failed to serialize: {e}")))?;
 
         let client = reqwest::Client::new();
-        let mut request = client.post(format!("{}/sync/push", endpoint)).json(&payload);
+        let mut request = client
+            .post(format!("{}/sync/push", endpoint))
+            .json(&payload);
 
         if let Some(token) = &self.auth_token {
             request = request.bearer_auth(token);
@@ -193,8 +195,7 @@ impl CloudSync {
                     ..item
                 };
                 synced_item.status = SyncStatus::Synced;
-                self.local_store
-                    .insert(synced_item.id.clone(), synced_item);
+                self.local_store.insert(synced_item.id.clone(), synced_item);
                 pulled += 1;
             }
         }
@@ -244,8 +245,7 @@ mod tests {
 
     #[test]
     fn test_cloud_sync_is_ready() {
-        let mut sync = CloudSync::new()
-            .with_endpoint("https://sync.example.com");
+        let mut sync = CloudSync::new().with_endpoint("https://sync.example.com");
         sync.set_enabled(true);
         assert!(sync.is_ready());
     }

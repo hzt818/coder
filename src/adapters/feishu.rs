@@ -3,8 +3,8 @@
 //! Connects to Feishu Open API, relays messages to the agent loop,
 //! and sends responses back.
 
-use async_trait::async_trait;
 use super::telegram::ImAdapter;
+use async_trait::async_trait;
 
 /// Configuration for the Feishu adapter.
 #[derive(Debug, Clone)]
@@ -36,7 +36,8 @@ impl FeishuAdapter {
 
     async fn get_access_token(&self) -> anyhow::Result<String> {
         let client = reqwest::Client::new();
-        let resp = client.post("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal")
+        let resp = client
+            .post("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal")
             .json(&serde_json::json!({
                 "app_id": self.config.app_id,
                 "app_secret": self.config.app_secret,
@@ -44,7 +45,8 @@ impl FeishuAdapter {
             .send()
             .await?;
         let data: serde_json::Value = resp.json().await?;
-        data["tenant_access_token"].as_str()
+        data["tenant_access_token"]
+            .as_str()
             .map(String::from)
             .ok_or_else(|| anyhow::anyhow!("Failed to get Feishu access token"))
     }
@@ -64,7 +66,8 @@ impl ImAdapter for FeishuAdapter {
         let token = self.get_access_token().await?;
         let client = reqwest::Client::new();
         let truncated = &text[..text.len().min(self.config.max_message_length)];
-        client.post("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id")
+        client
+            .post("https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id")
             .header("Authorization", format!("Bearer {}", token))
             .json(&serde_json::json!({
                 "receive_id": chat_id.to_string(),

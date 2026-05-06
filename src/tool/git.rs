@@ -3,8 +3,8 @@
 //! Supports status, diff, log, commit, and push operations.
 //! Uses gix crate with fallback to bash git commands.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct GitTool;
 
@@ -43,16 +43,16 @@ impl Tool for GitTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let operation = args.get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let operation = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
-        let repo_path = args.get("repo_path")
+        let repo_path = args
+            .get("repo_path")
             .and_then(|p| p.as_str())
             .unwrap_or(".")
             .to_string();
 
-        let extra_args = args.get("args")
+        let extra_args = args
+            .get("args")
             .and_then(|a| a.as_object())
             .cloned()
             .unwrap_or_default();
@@ -142,7 +142,10 @@ async fn git_status(repo_path: &str) -> ToolResult {
 }
 
 /// Show git diff
-async fn git_diff(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
+async fn git_diff(
+    repo_path: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> ToolResult {
     let mut git_args = vec!["diff"];
 
     if let Some(staged) = args.get("staged").and_then(|s| s.as_bool()) {
@@ -165,12 +168,14 @@ async fn git_diff(repo_path: &str, args: &serde_json::Map<String, serde_json::Va
 
 /// Show git log
 async fn git_log(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let max_count = args.get("max_count")
+    let max_count = args
+        .get("max_count")
         .and_then(|m| m.as_u64())
         .unwrap_or(10)
         .to_string();
 
-    let format = args.get("format")
+    let format = args
+        .get("format")
         .and_then(|f| f.as_str())
         .unwrap_or("%h %s (%an, %ar)");
 
@@ -190,18 +195,17 @@ async fn git_log(repo_path: &str, args: &serde_json::Map<String, serde_json::Val
 }
 
 /// Git commit
-async fn git_commit(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let message = args.get("message")
-        .and_then(|m| m.as_str())
-        .unwrap_or("");
+async fn git_commit(
+    repo_path: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> ToolResult {
+    let message = args.get("message").and_then(|m| m.as_str()).unwrap_or("");
 
     if message.is_empty() {
         return ToolResult::err("Commit message is required");
     }
 
-    let all = args.get("all")
-        .and_then(|a| a.as_bool())
-        .unwrap_or(false);
+    let all = args.get("all").and_then(|a| a.as_bool()).unwrap_or(false);
 
     if all {
         // Stage tracked files with modifications (-u), avoids staging untracked files
@@ -225,8 +229,12 @@ async fn git_commit(repo_path: &str, args: &serde_json::Map<String, serde_json::
 }
 
 /// Git push
-async fn git_push(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let remote = args.get("remote")
+async fn git_push(
+    repo_path: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> ToolResult {
+    let remote = args
+        .get("remote")
         .and_then(|r| r.as_str())
         .unwrap_or("origin");
 
@@ -244,10 +252,11 @@ async fn git_push(repo_path: &str, args: &serde_json::Map<String, serde_json::Va
 }
 
 /// Git blame
-async fn git_blame(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let file = args.get("file")
-        .and_then(|f| f.as_str())
-        .unwrap_or("");
+async fn git_blame(
+    repo_path: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> ToolResult {
+    let file = args.get("file").and_then(|f| f.as_str()).unwrap_or("");
 
     if file.is_empty() {
         return ToolResult::err("'file' argument is required for blame");
@@ -285,10 +294,11 @@ async fn git_blame(repo_path: &str, args: &serde_json::Map<String, serde_json::V
 }
 
 /// Git branch operations
-async fn git_branch(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let list = args.get("list")
-        .and_then(|l| l.as_bool())
-        .unwrap_or(true); // Default to listing
+async fn git_branch(
+    repo_path: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> ToolResult {
+    let list = args.get("list").and_then(|l| l.as_bool()).unwrap_or(true); // Default to listing
 
     if list {
         let git_args = ["branch", "--all"];
@@ -324,7 +334,9 @@ async fn git_branch(repo_path: &str, args: &serde_json::Map<String, serde_json::
             let git_args = ["branch", new_branch];
             match run_git_command(repo_path, &git_args).await {
                 Ok(o) => ToolResult::ok(format!("Created branch '{}':\n{}", new_branch, o)),
-                Err(e) => ToolResult::err(format!("Failed to create branch '{}': {}", new_branch, e)),
+                Err(e) => {
+                    ToolResult::err(format!("Failed to create branch '{}': {}", new_branch, e))
+                }
             }
         } else {
             ToolResult::err("Specify --delete <name> or --create <name> for branch operation")
@@ -333,16 +345,26 @@ async fn git_branch(repo_path: &str, args: &serde_json::Map<String, serde_json::
 }
 
 /// Git show (view commit details)
-async fn git_show(repo_path: &str, args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let revision = args.get("revision")
+async fn git_show(
+    repo_path: &str,
+    args: &serde_json::Map<String, serde_json::Value>,
+) -> ToolResult {
+    let revision = args
+        .get("revision")
         .and_then(|r| r.as_str())
         .unwrap_or("HEAD");
 
-    let format = args.get("format")
+    let format = args
+        .get("format")
         .and_then(|f| f.as_str())
         .unwrap_or("%H%n%an%n%ae%n%ad%n%s%n%b");
 
-    let git_args = ["show", "--no-color", &format!("--format={}", format), revision];
+    let git_args = [
+        "show",
+        "--no-color",
+        &format!("--format={}", format),
+        revision,
+    ];
 
     let output = match run_git_command(repo_path, &git_args).await {
         Ok(o) => o,
@@ -380,14 +402,18 @@ mod tests {
     #[tokio::test]
     async fn test_git_blame_no_file() {
         let tool = GitTool;
-        let result = tool.execute(serde_json::json!({"operation": "blame"})).await;
+        let result = tool
+            .execute(serde_json::json!({"operation": "blame"}))
+            .await;
         assert!(!result.success);
     }
 
     #[tokio::test]
     async fn test_git_invalid_operation() {
         let tool = GitTool;
-        let result = tool.execute(serde_json::json!({"operation": "unknown"})).await;
+        let result = tool
+            .execute(serde_json::json!({"operation": "unknown"}))
+            .await;
         assert!(!result.success);
     }
 }

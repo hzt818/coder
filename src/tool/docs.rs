@@ -3,8 +3,8 @@
 //! This tool allows the AI to look up documentation for libraries and frameworks,
 //! getting up-to-date API information and usage examples.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct DocsTool;
 
@@ -36,13 +36,9 @@ impl Tool for DocsTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let library = args.get("library")
-            .and_then(|l| l.as_str())
-            .unwrap_or("");
+        let library = args.get("library").and_then(|l| l.as_str()).unwrap_or("");
 
-        let query = args.get("query")
-            .and_then(|q| q.as_str())
-            .unwrap_or("");
+        let query = args.get("query").and_then(|q| q.as_str()).unwrap_or("");
 
         if library.is_empty() || query.is_empty() {
             return ToolResult::err("Both 'library' and 'query' are required");
@@ -70,29 +66,38 @@ async fn fetch_docs_web(library: &str, query: &str) -> Result<String, String> {
         .map_err(|e| format!("Client error: {}", e))?;
 
     // Try DuckDuckGo HTML first
-    let url = format!("https://html.duckduckgo.com/html/?q={}", urlencode(&search_query));
-    let response = client.get(&url)
+    let url = format!(
+        "https://html.duckduckgo.com/html/?q={}",
+        urlencode(&search_query)
+    );
+    let response = client
+        .get(&url)
         .header("User-Agent", "Mozilla/5.0 (compatible; CoderDocs/1.0)")
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
 
-    let body = response.text().await
+    let body = response
+        .text()
+        .await
         .map_err(|e| format!("Body error: {}", e))?;
 
     // Strip HTML tags and extract meaningful text content
     let text = strip_html_tags(&body);
-    let lines: Vec<&str> = text.lines()
+    let lines: Vec<&str> = text
+        .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect();
 
     // Find relevant content (skip navigation/boilerplate)
-    let start_idx = lines.iter()
+    let start_idx = lines
+        .iter()
         .position(|l| l.to_lowercase().contains(&library.to_lowercase()))
         .unwrap_or(0);
 
-    let relevant: Vec<&str> = lines.iter()
+    let relevant: Vec<&str> = lines
+        .iter()
         .skip(start_idx)
         .take(200) // limit output
         .map(|l| *l)
@@ -195,7 +200,9 @@ mod tests {
     #[tokio::test]
     async fn test_docs_empty_args() {
         let tool = DocsTool;
-        let result = tool.execute(serde_json::json!({"library": "", "query": ""})).await;
+        let result = tool
+            .execute(serde_json::json!({"library": "", "query": ""}))
+            .await;
         assert!(!result.success);
     }
 
@@ -228,7 +235,15 @@ mod tests {
         // Without whitespace between tags, items get concatenated
         let stripped = strip_html_tags(html);
         let result = stripped.trim();
-        assert!(result.contains("Item 1"), "Expected 'Item 1' in result, got: '{}'", result);
-        assert!(result.contains("Item 2"), "Expected 'Item 2' in result, got: '{}'", result);
+        assert!(
+            result.contains("Item 1"),
+            "Expected 'Item 1' in result, got: '{}'",
+            result
+        );
+        assert!(
+            result.contains("Item 2"),
+            "Expected 'Item 2' in result, got: '{}'",
+            result
+        );
     }
 }

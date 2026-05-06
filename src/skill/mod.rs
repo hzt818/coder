@@ -4,13 +4,13 @@
 //! with structured input and produce structured output. Builtin
 //! skills include brainstorming, code review, planning, and debugging.
 
-pub mod registry;
-pub mod loader;
 pub mod builtin;
+pub mod loader;
+pub mod registry;
 
-pub use registry::SkillRegistry;
-pub use loader::SkillLoader;
 pub use builtin::Skill;
+pub use loader::SkillLoader;
+pub use registry::SkillRegistry;
 
 /// Result of executing a skill
 pub type SkillResult = anyhow::Result<serde_json::Value>;

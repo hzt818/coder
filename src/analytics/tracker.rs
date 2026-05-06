@@ -146,7 +146,12 @@ impl AnalyticsTracker {
     }
 
     /// Track a tool execution
-    pub fn track_tool_execution(&mut self, tool_name: &str, duration_ms: u64, success: bool) -> AnalyticsResult<()> {
+    pub fn track_tool_execution(
+        &mut self,
+        tool_name: &str,
+        duration_ms: u64,
+        success: bool,
+    ) -> AnalyticsResult<()> {
         let mut metadata = HashMap::new();
         metadata.insert("success".to_string(), success.to_string());
 
@@ -157,7 +162,11 @@ impl AnalyticsTracker {
         let event = AnalyticsEvent {
             name: format!("tool.{}", tool_name),
             category: "tools".to_string(),
-            severity: if success { EventSeverity::Info } else { EventSeverity::Warning },
+            severity: if success {
+                EventSeverity::Info
+            } else {
+                EventSeverity::Warning
+            },
             timestamp: self.now(),
             duration_ms: Some(duration_ms),
             metadata,
@@ -217,7 +226,11 @@ impl AnalyticsTracker {
     pub fn save_to_file(&self, path: &std::path::Path) -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(&self.events)?;
         std::fs::write(path, json)?;
-        tracing::debug!("Saved {} analytics events to {}", self.events.len(), path.display());
+        tracing::debug!(
+            "Saved {} analytics events to {}",
+            self.events.len(),
+            path.display()
+        );
         Ok(())
     }
 
@@ -232,7 +245,11 @@ impl AnalyticsTracker {
         for event in events {
             tracker.push_event(event);
         }
-        tracing::debug!("Loaded {} analytics events from {}", tracker.events.len(), path.display());
+        tracing::debug!(
+            "Loaded {} analytics events from {}",
+            tracker.events.len(),
+            path.display()
+        );
         Ok(tracker)
     }
 
@@ -279,7 +296,9 @@ mod tests {
     #[test]
     fn test_track_event() {
         let mut tracker = AnalyticsTracker::new();
-        tracker.track_event("test_event", "test", EventSeverity::Info).unwrap();
+        tracker
+            .track_event("test_event", "test", EventSeverity::Info)
+            .unwrap();
         assert_eq!(tracker.event_count(), 1);
     }
 
@@ -287,7 +306,9 @@ mod tests {
     fn test_track_disabled() {
         let mut tracker = AnalyticsTracker::new();
         tracker.set_enabled(false);
-        tracker.track_event("test", "test", EventSeverity::Info).unwrap();
+        tracker
+            .track_event("test", "test", EventSeverity::Info)
+            .unwrap();
         assert_eq!(tracker.event_count(), 0);
     }
 
@@ -312,7 +333,9 @@ mod tests {
     #[test]
     fn test_export_json() {
         let mut tracker = AnalyticsTracker::new();
-        tracker.track_event("test_event", "test", EventSeverity::Info).unwrap();
+        tracker
+            .track_event("test_event", "test", EventSeverity::Info)
+            .unwrap();
         let json = tracker.export_json().unwrap();
         assert!(json.contains("test_event"));
     }
@@ -320,7 +343,9 @@ mod tests {
     #[test]
     fn test_clear_events() {
         let mut tracker = AnalyticsTracker::new();
-        tracker.track_event("test", "test", EventSeverity::Info).unwrap();
+        tracker
+            .track_event("test", "test", EventSeverity::Info)
+            .unwrap();
         tracker.clear_events();
         assert_eq!(tracker.event_count(), 0);
     }

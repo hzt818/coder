@@ -2,10 +2,10 @@
 //!
 //! Supports: OpenAI, DeepSeek, Ollama, MiniMax, Groq, and any OpenAI-compatible API.
 
+use super::provider::{Provider, StreamHandler};
+use super::*;
 use async_trait::async_trait;
 use futures::StreamExt;
-use super::*;
-use super::provider::{Provider, StreamHandler};
 
 /// OpenAI-compatible provider
 #[derive(Debug)]
@@ -31,7 +31,12 @@ impl OpenAIProvider {
     }
 
     /// Build the request body for the chat completions API
-    fn build_request(&self, messages: &[Message], tools: &[ToolDef], config: &GenerateConfig) -> serde_json::Value {
+    fn build_request(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDef],
+        config: &GenerateConfig,
+    ) -> serde_json::Value {
         let mut body = serde_json::json!({
             "model": self.model,
             "messages": crate::ai::types::messages_to_openai(messages),
@@ -50,16 +55,19 @@ impl OpenAIProvider {
 
         // thinking_budget is Anthropic-only; NOT sent to OpenAI-compatible APIs
         if !tools.is_empty() {
-            body["tools"] = serde_json::json!(tools.iter().map(|t| {
-                serde_json::json!({
-                    "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.input_schema,
-                    }
+            body["tools"] = serde_json::json!(tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.input_schema,
+                        }
+                    })
                 })
-            }).collect::<Vec<_>>());
+                .collect::<Vec<_>>());
         }
 
         body
@@ -250,10 +258,8 @@ pub async fn process_sse_data(
                 .unwrap_or("{}");
 
             // Try to parse arguments as JSON; fall back to raw string
-            let args_value: serde_json::Value =
-                serde_json::from_str(arguments).unwrap_or_else(|_| {
-                    serde_json::Value::String(arguments.to_string())
-                });
+            let args_value: serde_json::Value = serde_json::from_str(arguments)
+                .unwrap_or_else(|_| serde_json::Value::String(arguments.to_string()));
 
             let _ = tx
                 .send(StreamEvent::ToolCallStart(ToolCall {

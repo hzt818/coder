@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub mod manager;
 pub mod history;
+pub mod manager;
 pub mod search;
 
 /// A conversation session

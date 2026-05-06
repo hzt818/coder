@@ -2,8 +2,8 @@
 //!
 //! Supports initiating OAuth flows, handling callbacks, and managing tokens.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct OAuthTool;
 
@@ -67,56 +67,75 @@ impl Tool for OAuthTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let operation = args.get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let operation = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
         if operation.is_empty() {
             return ToolResult::err("Operation is required (authorize, token, refresh, list)");
         }
 
-        let provider = args.get("provider")
+        let provider = args
+            .get("provider")
             .and_then(|p| p.as_str())
             .unwrap_or("")
             .to_string();
 
-        let scopes = args.get("scopes")
+        let scopes = args
+            .get("scopes")
             .and_then(|s| s.as_str())
             .unwrap_or("")
             .to_string();
 
-        let client_id = args.get("client_id")
+        let client_id = args
+            .get("client_id")
             .and_then(|c| c.as_str())
             .unwrap_or("")
             .to_string();
 
-        let client_secret = args.get("client_secret")
+        let client_secret = args
+            .get("client_secret")
             .and_then(|c| c.as_str())
             .unwrap_or("")
             .to_string();
 
-        let auth_url = args.get("auth_url")
+        let auth_url = args
+            .get("auth_url")
             .and_then(|a| a.as_str())
             .unwrap_or("")
             .to_string();
 
-        let token_url = args.get("token_url")
+        let token_url = args
+            .get("token_url")
             .and_then(|t| t.as_str())
             .unwrap_or("")
             .to_string();
 
-        let redirect_uri = args.get("redirect_uri")
+        let redirect_uri = args
+            .get("redirect_uri")
             .and_then(|r| r.as_str())
             .unwrap_or("http://localhost:3000/callback")
             .to_string();
         let _ = &redirect_uri;
 
         match operation {
-            "authorize" => oauth_authorize(&provider, &scopes, &client_id, &auth_url, &redirect_uri).await,
-            "token" => oauth_token(&provider, &client_id, &client_secret, &token_url, &redirect_uri).await,
+            "authorize" => {
+                oauth_authorize(&provider, &scopes, &client_id, &auth_url, &redirect_uri).await
+            }
+            "token" => {
+                oauth_token(
+                    &provider,
+                    &client_id,
+                    &client_secret,
+                    &token_url,
+                    &redirect_uri,
+                )
+                .await
+            }
             "refresh" => oauth_refresh(&provider, &client_id, &client_secret, &token_url).await,
             "list" => oauth_list_providers().await,
-            _ => ToolResult::err(format!("Unknown OAuth operation: '{}'. Use: authorize, token, refresh, list", operation)),
+            _ => ToolResult::err(format!(
+                "Unknown OAuth operation: '{}'. Use: authorize, token, refresh, list",
+                operation
+            )),
         }
     }
 
@@ -174,13 +193,16 @@ async fn oauth_authorize(
         (auth_url.to_string(), String::new())
     };
 
-    let resolved_scopes = if scopes.is_empty() { default_scopes } else { scopes.to_string() };
+    let resolved_scopes = if scopes.is_empty() {
+        default_scopes
+    } else {
+        scopes.to_string()
+    };
 
     // Get client_id from environment or argument
     let resolved_client_id = if client_id.is_empty() {
         let env_var = format!("{}_CLIENT_ID", provider.to_uppercase());
-        std::env::var(&env_var)
-            .unwrap_or_else(|_| "".to_string())
+        std::env::var(&env_var).unwrap_or_else(|_| "".to_string())
     } else {
         client_id.to_string()
     };
@@ -195,12 +217,22 @@ async fn oauth_authorize(
     );
 
     let mut result = format!("OAuth Authorization URL generated:\n\n");
-    result.push_str(&format!("  Provider: {}\n", if !provider.is_empty() { provider } else { "custom" }));
+    result.push_str(&format!(
+        "  Provider: {}\n",
+        if !provider.is_empty() {
+            provider
+        } else {
+            "custom"
+        }
+    ));
     result.push_str(&format!("  Scopes: {}\n", resolved_scopes));
     result.push_str(&format!("  Redirect URI: {}\n\n", redirect_uri));
     result.push_str(&format!("  Authorization URL:\n  {}\n\n", auth_uri));
     result.push_str("Open this URL in a browser to authorize. After authorization, ");
-    result.push_str(&format!("you will be redirected to {} with a code parameter.", redirect_uri));
+    result.push_str(&format!(
+        "you will be redirected to {} with a code parameter.",
+        redirect_uri
+    ));
     result.push_str("\n\nUse the 'token' operation with the code to complete the flow.");
 
     ToolResult::ok(result)
@@ -234,7 +266,11 @@ async fn oauth_token(
             None => return ToolResult::err(format!("Unknown provider '{}'", provider)),
         }
     } else {
-        (token_url.to_string(), client_id.to_string(), client_secret.to_string())
+        (
+            token_url.to_string(),
+            client_id.to_string(),
+            client_secret.to_string(),
+        )
     };
 
     if resolved_client_id.is_empty() {
@@ -242,7 +278,9 @@ async fn oauth_token(
     }
 
     if resolved_client_secret.is_empty() {
-        return ToolResult::err("Client secret is required. Set via argument or environment variable.");
+        return ToolResult::err(
+            "Client secret is required. Set via argument or environment variable.",
+        );
     }
 
     ToolResult::ok(format!(
@@ -275,7 +313,9 @@ async fn oauth_list_providers() -> ToolResult {
         result.push_str(&format!("  - {}\n", p));
     }
 
-    result.push_str("\nCustom providers can be configured by specifying auth_url and token_url directly.");
+    result.push_str(
+        "\nCustom providers can be configured by specifying auth_url and token_url directly.",
+    );
     result.push_str("\n\nProvider credentials can be set via environment variables:\n");
     result.push_str("  {PROVIDER}_CLIENT_ID\n");
     result.push_str("  {PROVIDER}_CLIENT_SECRET\n");
@@ -335,7 +375,9 @@ mod tests {
     #[tokio::test]
     async fn test_oauth_authorize_no_provider() {
         let tool = OAuthTool;
-        let result = tool.execute(serde_json::json!({"operation": "authorize"})).await;
+        let result = tool
+            .execute(serde_json::json!({"operation": "authorize"}))
+            .await;
         assert!(!result.success);
     }
 

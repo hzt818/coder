@@ -11,6 +11,6 @@ pub mod provider_config;
 pub mod settings;
 pub mod theme;
 
+pub use provider_config::ProviderConfig;
 pub use settings::Settings;
 pub use settings::UiSettings;
-pub use provider_config::ProviderConfig;

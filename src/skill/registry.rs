@@ -33,7 +33,8 @@ impl SkillRegistry {
 
     /// Register a skill
     pub fn register(&mut self, skill: impl Skill + 'static) -> &mut Self {
-        self.skills.insert(skill.name().to_string(), Box::new(skill));
+        self.skills
+            .insert(skill.name().to_string(), Box::new(skill));
         self
     }
 
@@ -145,7 +146,10 @@ impl SkillRegistry {
             "source": "local"
         });
 
-        std::fs::write(&registry_file, serde_json::to_string_pretty(&registry_content)?)?;
+        std::fs::write(
+            &registry_file,
+            serde_json::to_string_pretty(&registry_content)?,
+        )?;
 
         let count = SkillRegistry::discover_from(&community_dir);
         Ok(format!(
@@ -165,7 +169,12 @@ impl SkillRegistry {
             } else {
                 " 🔧"
             };
-            result.push_str(&format!("  {}{} - {}\n", name, discovered, skill.description()));
+            result.push_str(&format!(
+                "  {}{} - {}\n",
+                name,
+                discovered,
+                skill.description()
+            ));
         }
 
         result
@@ -203,9 +212,7 @@ mod tests {
     #[tokio::test]
     async fn test_execute_unknown_skill() {
         let reg = SkillRegistry::new();
-        let result = reg
-            .execute("nonexistent", serde_json::json!({}))
-            .await;
+        let result = reg.execute("nonexistent", serde_json::json!({})).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }

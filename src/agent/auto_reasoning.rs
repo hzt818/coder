@@ -18,8 +18,18 @@ pub fn select_effort(prompt: &str) -> ReasoningEffort {
 
     // Check for debug/error/fix patterns → Max
     let max_keywords = [
-        "debug", "error", "bug", "fix", "crash", "panic", "fail",
-        "traceback", "exception", "wrong", "incorrect", "broken",
+        "debug",
+        "error",
+        "bug",
+        "fix",
+        "crash",
+        "panic",
+        "fail",
+        "traceback",
+        "exception",
+        "wrong",
+        "incorrect",
+        "broken",
     ];
     if max_keywords.iter().any(|k| lower.contains(k)) {
         return ReasoningEffort::Max;
@@ -27,8 +37,15 @@ pub fn select_effort(prompt: &str) -> ReasoningEffort {
 
     // Check for search/lookup patterns → Low
     let low_keywords = [
-        "search", "lookup", "find", "what is", "explain briefly",
-        "summarize", "list", "show me", "tell me about",
+        "search",
+        "lookup",
+        "find",
+        "what is",
+        "explain briefly",
+        "summarize",
+        "list",
+        "show me",
+        "tell me about",
     ];
     if low_keywords.iter().any(|k| lower.contains(k)) {
         return ReasoningEffort::Low;

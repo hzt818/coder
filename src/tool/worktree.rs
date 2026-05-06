@@ -3,8 +3,8 @@
 //! Supports creating, removing, and listing git worktrees.
 //! Uses gix crate with fallback to bash git commands.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct WorktreeTool;
 
@@ -58,15 +58,14 @@ impl Tool for WorktreeTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let action = args.get("action")
-            .and_then(|a| a.as_str())
-            .unwrap_or("");
+        let action = args.get("action").and_then(|a| a.as_str()).unwrap_or("");
 
         if action.is_empty() {
             return ToolResult::err("Action is required (create, remove, list, prune)");
         }
 
-        let repo_path = args.get("repo_path")
+        let repo_path = args
+            .get("repo_path")
             .and_then(|p| p.as_str())
             .unwrap_or(".")
             .to_string();
@@ -74,18 +73,37 @@ impl Tool for WorktreeTool {
         match action {
             "list" => worktree_list(&repo_path).await,
             "create" => {
-                let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string();
-                let branch = args.get("branch").and_then(|b| b.as_str()).unwrap_or("").to_string();
-                let commit = args.get("commit").and_then(|c| c.as_str()).unwrap_or("").to_string();
+                let path = args
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let branch = args
+                    .get("branch")
+                    .and_then(|b| b.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let commit = args
+                    .get("commit")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 worktree_create(&repo_path, &path, &branch, &commit).await
             }
             "remove" => {
-                let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string();
+                let path = args
+                    .get("path")
+                    .and_then(|p| p.as_str())
+                    .unwrap_or("")
+                    .to_string();
                 let force = args.get("force").and_then(|f| f.as_bool()).unwrap_or(false);
                 worktree_remove(&repo_path, &path, force).await
             }
             "prune" => worktree_prune(&repo_path).await,
-            _ => ToolResult::err(format!("Unknown worktree action: '{}'. Use: create, remove, list, prune", action)),
+            _ => ToolResult::err(format!(
+                "Unknown worktree action: '{}'. Use: create, remove, list, prune",
+                action
+            )),
         }
     }
 
@@ -176,7 +194,10 @@ async fn worktree_create(repo_path: &str, path: &str, branch: &str, commit: &str
             } else {
                 String::new()
             };
-            ToolResult::ok(format!("Worktree created at '{}'{}\n\n{}", path, branch_info, output))
+            ToolResult::ok(format!(
+                "Worktree created at '{}'{}\n\n{}",
+                path, branch_info, output
+            ))
         }
         Err(e) => ToolResult::err(format!("Failed to create worktree: {}", e)),
     }
@@ -253,10 +274,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let path_str = tmp.path().to_str().unwrap();
 
-        let result = tool.execute(serde_json::json!({
-            "action": "list",
-            "repo_path": path_str
-        })).await;
+        let result = tool
+            .execute(serde_json::json!({
+                "action": "list",
+                "repo_path": path_str
+            }))
+            .await;
         assert!(!result.success);
     }
 }

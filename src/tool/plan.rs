@@ -4,14 +4,16 @@
 //! to generate a step-by-step implementation plan. Falls back to a
 //! template when no provider is configured.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct PlanTool;
 
 #[async_trait]
 impl Tool for PlanTool {
-    fn name(&self) -> &str { "plan" }
+    fn name(&self) -> &str {
+        "plan"
+    }
 
     fn description(&self) -> &str {
         "Create a structured plan before implementing complex features. Analyzes requirements and breaks them into actionable steps using AI."
@@ -30,8 +32,13 @@ impl Tool for PlanTool {
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let goal = args.get("goal").and_then(|g| g.as_str()).unwrap_or("");
-        if goal.is_empty() { return ToolResult::err("Goal is required"); }
-        let constraints = args.get("constraints").and_then(|c| c.as_str()).unwrap_or("");
+        if goal.is_empty() {
+            return ToolResult::err("Goal is required");
+        }
+        let constraints = args
+            .get("constraints")
+            .and_then(|c| c.as_str())
+            .unwrap_or("");
 
         // Try AI-powered planning first
         if let Some(plan) = ai_generate_plan(goal, constraints).await {
@@ -53,7 +60,9 @@ impl Tool for PlanTool {
         ToolResult::ok(plan)
     }
 
-    fn requires_permission(&self) -> bool { false }
+    fn requires_permission(&self) -> bool {
+        false
+    }
 }
 
 /// Generate a plan using the configured AI provider.
@@ -76,7 +85,8 @@ async fn ai_generate_plan(goal: &str, constraints: &str) -> Option<String> {
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
-        .build().ok()?;
+        .build()
+        .ok()?;
 
     let body = serde_json::json!({
         "model": model,
@@ -94,9 +104,12 @@ async fn ai_generate_plan(goal: &str, constraints: &str) -> Option<String> {
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
-        .await.ok()?;
+        .await
+        .ok()?;
 
-    if !resp.status().is_success() { return None; }
+    if !resp.status().is_success() {
+        return None;
+    }
 
     let json: serde_json::Value = resp.json().await.ok()?;
     let text = json["choices"][0]["message"]["content"].as_str()?;
@@ -108,17 +121,30 @@ async fn ai_generate_plan(goal: &str, constraints: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    #[test] fn test_plan_tool_name() { assert_eq!(PlanTool.name(), "plan"); }
-    #[test] fn test_plan_schema() {
+    #[test]
+    fn test_plan_tool_name() {
+        assert_eq!(PlanTool.name(), "plan");
+    }
+    #[test]
+    fn test_plan_schema() {
         let schema = PlanTool.schema();
         assert!(schema.get("properties").is_some());
         assert!(schema.get("required").is_some());
     }
-    #[tokio::test] async fn test_plan_empty_goal() {
-        assert!(!PlanTool.execute(serde_json::json!({"goal": ""})).await.success);
+    #[tokio::test]
+    async fn test_plan_empty_goal() {
+        assert!(
+            !PlanTool
+                .execute(serde_json::json!({"goal": ""}))
+                .await
+                .success
+        );
     }
-    #[tokio::test] async fn test_plan_fallback() {
-        let r = PlanTool.execute(serde_json::json!({"goal": "Build a web server"})).await;
+    #[tokio::test]
+    async fn test_plan_fallback() {
+        let r = PlanTool
+            .execute(serde_json::json!({"goal": "Build a web server"}))
+            .await;
         assert!(r.success);
         assert!(r.output.contains("Plan:"));
         assert!(r.output.contains("Steps:"));

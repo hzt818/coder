@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::sync::Mutex;
 
 static GATES: Mutex<Vec<GateRecord>> = Mutex::new(Vec::new());
@@ -25,8 +25,12 @@ pub struct TaskGateTool;
 
 #[async_trait]
 impl Tool for TaskGateTool {
-    fn name(&self) -> &str { "task_gate" }
-    fn description(&self) -> &str { "Run verification commands and attach structured evidence to tasks." }
+    fn name(&self) -> &str {
+        "task_gate"
+    }
+    fn description(&self) -> &str {
+        "Run verification commands and attach structured evidence to tasks."
+    }
 
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
@@ -55,8 +59,10 @@ impl Tool for TaskGateTool {
                     ("sh", "-c")
                 };
                 let output = tokio::process::Command::new(shell)
-                    .arg(arg).arg(command)
-                    .output().await;
+                    .arg(arg)
+                    .arg(command)
+                    .output()
+                    .await;
                 let duration = start.elapsed().as_millis() as u64;
                 match output {
                     Ok(o) => {
@@ -66,7 +72,16 @@ impl Tool for TaskGateTool {
                         let classification = if code == 0 { "pass" } else { "fail" };
                         let mut gates = GATES.lock().unwrap();
                         let id = gates.len() + 1;
-                        gates.push(GateRecord { id, task_id: task_id.into(), command: command.into(), exit_code: code, duration_ms: duration, stdout, stderr, classification: classification.into() });
+                        gates.push(GateRecord {
+                            id,
+                            task_id: task_id.into(),
+                            command: command.into(),
+                            exit_code: code,
+                            duration_ms: duration,
+                            stdout,
+                            stderr,
+                            classification: classification.into(),
+                        });
                         if gates.len() > MAX_GATES {
                             gates.remove(0);
                         }
@@ -78,10 +93,21 @@ impl Tool for TaskGateTool {
             "list" => {
                 let task_id = args.get("task_id").and_then(|t| t.as_str()).unwrap_or("");
                 let gates = GATES.lock().unwrap();
-                let results: Vec<&GateRecord> = if task_id.is_empty() { gates.iter().collect() } else { gates.iter().filter(|g| g.task_id == task_id).collect() };
-                if results.is_empty() { return ToolResult::ok("No gate results."); }
+                let results: Vec<&GateRecord> = if task_id.is_empty() {
+                    gates.iter().collect()
+                } else {
+                    gates.iter().filter(|g| g.task_id == task_id).collect()
+                };
+                if results.is_empty() {
+                    return ToolResult::ok("No gate results.");
+                }
                 let mut out = format!("Gate results ({}):\n", results.len());
-                for g in &results { out.push_str(&format!("  #{} [{}] {} - {}ms\n", g.id, g.classification, g.command, g.duration_ms)); }
+                for g in &results {
+                    out.push_str(&format!(
+                        "  #{} [{}] {} - {}ms\n",
+                        g.id, g.classification, g.command, g.duration_ms
+                    ));
+                }
                 ToolResult::ok(out)
             }
             _ => ToolResult::err(format!("Unknown operation: {}", op)),
@@ -96,9 +122,34 @@ impl Tool for TaskGateTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn test_name() { assert_eq!(TaskGateTool.name(), "task_gate"); }
-    #[test] fn test_schema() { assert!(TaskGateTool.schema().get("properties").is_some()); }
-    #[tokio::test] async fn test_empty_op() { assert!(!TaskGateTool.execute(serde_json::json!({})).await.success); }
-    #[tokio::test] async fn test_list() { assert!(TaskGateTool.execute(serde_json::json!({"operation":"list"})).await.success); }
-    #[tokio::test] async fn test_run_no_args() { assert!(!TaskGateTool.execute(serde_json::json!({"operation":"run"})).await.success); }
+    #[test]
+    fn test_name() {
+        assert_eq!(TaskGateTool.name(), "task_gate");
+    }
+    #[test]
+    fn test_schema() {
+        assert!(TaskGateTool.schema().get("properties").is_some());
+    }
+    #[tokio::test]
+    async fn test_empty_op() {
+        assert!(!TaskGateTool.execute(serde_json::json!({})).await.success);
+    }
+    #[tokio::test]
+    async fn test_list() {
+        assert!(
+            TaskGateTool
+                .execute(serde_json::json!({"operation":"list"}))
+                .await
+                .success
+        );
+    }
+    #[tokio::test]
+    async fn test_run_no_args() {
+        assert!(
+            !TaskGateTool
+                .execute(serde_json::json!({"operation":"run"}))
+                .await
+                .success
+        );
+    }
 }

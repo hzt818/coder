@@ -53,8 +53,9 @@ impl Settings {
             }
         };
 
-        let content = std::fs::read_to_string(&config_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read config {}: {}", config_path.display(), e))?;
+        let content = std::fs::read_to_string(&config_path).map_err(|e| {
+            anyhow::anyhow!("Failed to read config {}: {}", config_path.display(), e)
+        })?;
 
         let mut settings: Settings = toml::from_str(&content)
             .map_err(|e| anyhow::anyhow!("Failed to parse config: {}", e))?;
@@ -140,7 +141,7 @@ impl Default for AiSettings {
             "opencode".to_string(),
             ProviderConfig {
                 provider_type: "opencode".to_string(),
-                api_key: None,  // None = anonymous/free tier
+                api_key: None, // None = anonymous/free tier
                 base_url: Some("https://opencode.ai/zen/v1".to_string()),
                 model: Some("claude-sonnet-4-6".to_string()),
                 ..Default::default()

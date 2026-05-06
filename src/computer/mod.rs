@@ -3,13 +3,13 @@
 //! Provides screen capture, mouse control, and keyboard input
 //! functionality for automated desktop interaction.
 
-pub mod screenshot;
-pub mod mouse;
 pub mod keyboard;
+pub mod mouse;
+pub mod screenshot;
 
-pub use screenshot::Screenshotter;
-pub use mouse::MouseController;
 pub use keyboard::KeyboardController;
+pub use mouse::MouseController;
+pub use screenshot::Screenshotter;
 
 /// Result type for computer operations
 pub type ComputerResult<T> = std::result::Result<T, ComputerError>;

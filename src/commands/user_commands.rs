@@ -95,9 +95,7 @@ impl UserCommandManager {
     /// $ARGUMENTS is replaced with the full argument string.
     /// $0 is replaced with the command name.
     pub fn apply_template(template: &str, cmd_name: &str, args: &str) -> String {
-        let mut result = template
-            .replace("$0", cmd_name)
-            .replace("$ARGUMENTS", args);
+        let mut result = template.replace("$0", cmd_name).replace("$ARGUMENTS", args);
 
         // Replace positional arguments $1, $2, etc.
         let arg_parts: Vec<&str> = args.split_whitespace().collect();
@@ -111,9 +109,8 @@ impl UserCommandManager {
 
     /// Render a command with the given arguments
     pub fn render(&self, name: &str, args: &str) -> Option<String> {
-        self.get(name).map(|cmd| {
-            Self::apply_template(&cmd.template, &cmd.name, args)
-        })
+        self.get(name)
+            .map(|cmd| Self::apply_template(&cmd.template, &cmd.name, args))
     }
 
     /// List all loaded commands
@@ -149,7 +146,8 @@ impl Default for UserCommandManager {
 pub fn format_user_commands(manager: &UserCommandManager) -> String {
     if manager.is_empty() {
         return "── User Commands ──\n\nNo user commands configured.\n\
-                Create .toml files in ~/.coder/commands/ or .coder/commands/".to_string();
+                Create .toml files in ~/.coder/commands/ or .coder/commands/"
+            .to_string();
     }
 
     let mut result = format!("── User Commands ({}) ──\n\n", manager.len());
@@ -169,51 +167,33 @@ mod tests {
 
     #[test]
     fn test_apply_template_simple() {
-        let result = UserCommandManager::apply_template(
-            "cargo build $1",
-            "build",
-            "--release",
-        );
+        let result = UserCommandManager::apply_template("cargo build $1", "build", "--release");
         assert_eq!(result, "cargo build --release");
     }
 
     #[test]
     fn test_apply_template_arguments() {
-        let result = UserCommandManager::apply_template(
-            "echo $ARGUMENTS",
-            "echo",
-            "hello world from test",
-        );
+        let result =
+            UserCommandManager::apply_template("echo $ARGUMENTS", "echo", "hello world from test");
         assert_eq!(result, "echo hello world from test");
     }
 
     #[test]
     fn test_apply_template_multiple_args() {
-        let result = UserCommandManager::apply_template(
-            "cp $1 $2",
-            "cp",
-            "src/file.rs dst/file.rs",
-        );
+        let result =
+            UserCommandManager::apply_template("cp $1 $2", "cp", "src/file.rs dst/file.rs");
         assert_eq!(result, "cp src/file.rs dst/file.rs");
     }
 
     #[test]
     fn test_apply_template_cmd_name() {
-        let result = UserCommandManager::apply_template(
-            "run $0 with $1",
-            "deploy",
-            "prod",
-        );
+        let result = UserCommandManager::apply_template("run $0 with $1", "deploy", "prod");
         assert_eq!(result, "run deploy with prod");
     }
 
     #[test]
     fn test_apply_template_no_placeholders() {
-        let result = UserCommandManager::apply_template(
-            "cargo test --workspace",
-            "test",
-            "",
-        );
+        let result = UserCommandManager::apply_template("cargo test --workspace", "test", "");
         assert_eq!(result, "cargo test --workspace");
     }
 

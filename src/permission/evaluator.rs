@@ -1,9 +1,6 @@
 //! Permission evaluation engine
 
-use super::{
-    policy::PolicySet,
-    Action, PermissionError, PermissionLevel, PermissionResult,
-};
+use super::{policy::PolicySet, Action, PermissionError, PermissionLevel, PermissionResult};
 
 /// Evaluates whether actions are permitted based on policies
 #[derive(Debug, Clone)]
@@ -61,18 +58,14 @@ impl PermissionEvaluator {
 
         match level {
             PermissionLevel::Allow => Ok(()),
-            PermissionLevel::Deny => {
-                Err(PermissionError::EvaluationFailed(format!(
-                    "Action '{}' is denied by policy",
-                    action.name
-                )))
-            }
-            PermissionLevel::Ask => {
-                Err(PermissionError::RequiresConfirmation(format!(
-                    "Action '{}' requires user confirmation",
-                    action.name
-                )))
-            }
+            PermissionLevel::Deny => Err(PermissionError::EvaluationFailed(format!(
+                "Action '{}' is denied by policy",
+                action.name
+            ))),
+            PermissionLevel::Ask => Err(PermissionError::RequiresConfirmation(format!(
+                "Action '{}' requires user confirmation",
+                action.name
+            ))),
         }
     }
 
@@ -83,10 +76,7 @@ impl PermissionEvaluator {
 
     /// Check if an action requires user confirmation
     pub fn requires_confirmation(&self, action: &Action) -> bool {
-        matches!(
-            self.policies.evaluate(action),
-            Ok(PermissionLevel::Ask)
-        )
+        matches!(self.policies.evaluate(action), Ok(PermissionLevel::Ask))
     }
 
     /// Get a reference to the underlying policy set
@@ -128,8 +118,8 @@ impl PermissionEvaluator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::Policy;
+    use super::*;
 
     #[test]
     fn test_evaluator_default_allows_nothing() {

@@ -59,9 +59,7 @@ impl From<ToolResult> for ExecuteResponse {
 
 /// `GET /api/tools` -- list all registered tools with their names,
 /// descriptions, and input schemas.
-pub async fn list_tools(
-    State(state): State<Arc<AppState>>,
-) -> Json<Vec<ToolInfo>> {
+pub async fn list_tools(State(state): State<Arc<AppState>>) -> Json<Vec<ToolInfo>> {
     let defs = state.tool_registry.tool_defs();
     let tools: Vec<ToolInfo> = defs
         .into_iter()

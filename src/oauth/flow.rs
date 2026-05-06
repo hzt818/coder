@@ -1,8 +1,6 @@
 //! OAuth 2.0 authorization code flow implementation
 
-use super::{
-    OAuthError, OAuthProviderConfig, OAuthResult, TokenResponse,
-};
+use super::{OAuthError, OAuthProviderConfig, OAuthResult, TokenResponse};
 
 /// Manages the OAuth 2.0 authorization code flow
 #[derive(Debug, Clone)]
@@ -37,10 +35,7 @@ impl OAuthFlow {
             .append_pair("client_id", &self.config.client_id)
             .append_pair("redirect_uri", &self.config.redirect_uri)
             .append_pair("state", state)
-            .append_pair(
-                "scope",
-                &self.config.scopes.join(" "),
-            );
+            .append_pair("scope", &self.config.scopes.join(" "));
 
         Ok(url.to_string())
     }
@@ -81,7 +76,10 @@ impl OAuthFlow {
     }
 
     /// Refresh the access token using a refresh token
-    pub async fn refresh_access_token(&mut self, refresh_token: &str) -> OAuthResult<TokenResponse> {
+    pub async fn refresh_access_token(
+        &mut self,
+        refresh_token: &str,
+    ) -> OAuthResult<TokenResponse> {
         let params = [
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),

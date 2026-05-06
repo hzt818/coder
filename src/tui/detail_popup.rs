@@ -1,8 +1,8 @@
 //! Detail popup - shown when user presses Ctrl+O
 
+use super::theme::AppTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use super::theme::AppTheme;
 
 /// Render the detail popup overlay
 pub fn render_detail_popup(frame: &mut Frame, area: Rect, content: &str, theme: &AppTheme) {
@@ -31,11 +31,8 @@ pub fn render_detail_popup(frame: &mut Frame, area: Rect, content: &str, theme: 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let text = Paragraph::new(Span::styled(
-        content,
-        Style::default().fg(theme.fg),
-    ))
-    .wrap(Wrap { trim: false });
+    let text = Paragraph::new(Span::styled(content, Style::default().fg(theme.fg)))
+        .wrap(Wrap { trim: false });
 
     frame.render_widget(text, inner);
 }

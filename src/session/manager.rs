@@ -1,7 +1,7 @@
 //! Session manager - handles session persistence
 
 use super::{Session, SessionSummary};
-use crate::util::path::{sessions_dir, ensure_dir};
+use crate::util::path::{ensure_dir, sessions_dir};
 
 /// Manages session persistence to disk
 pub struct SessionManager {
@@ -37,7 +37,8 @@ impl SessionManager {
         let save_dir = self.sessions_dir.clone();
 
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(interval_secs));
             // Skip the immediate first tick (avoid saving before any message)
             interval.tick().await;
             loop {

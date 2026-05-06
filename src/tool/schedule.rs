@@ -3,9 +3,9 @@
 //! Uses the existing AutomationManager from `core::automation` for persistence,
 //! and exposes 4 tools: `cron_create`, `cron_update`, `cron_delete`, `cron_list`.
 
-use async_trait::async_trait;
 use super::*;
 use crate::core::automation;
+use async_trait::async_trait;
 
 pub struct CronCreate;
 pub struct CronUpdate;
@@ -14,7 +14,9 @@ pub struct CronList;
 
 #[async_trait]
 impl Tool for CronCreate {
-    fn name(&self) -> &str { "cron_create" }
+    fn name(&self) -> &str {
+        "cron_create"
+    }
     fn description(&self) -> &str {
         "Create a recurring scheduled automation. The schedule uses cron format: 'minute hour day-of-month month day-of-week'."
     }
@@ -42,13 +44,19 @@ impl Tool for CronCreate {
             None => ToolResult::err("Automation manager not initialized"),
         }
     }
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait]
 impl Tool for CronUpdate {
-    fn name(&self) -> &str { "cron_update" }
-    fn description(&self) -> &str { "Update an existing scheduled automation." }
+    fn name(&self) -> &str {
+        "cron_update"
+    }
+    fn description(&self) -> &str {
+        "Update an existing scheduled automation."
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {
@@ -61,7 +69,9 @@ impl Tool for CronUpdate {
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let id = args.get("id").and_then(|i| i.as_str()).unwrap_or("");
-        if id.is_empty() { return ToolResult::err("id is required"); }
+        if id.is_empty() {
+            return ToolResult::err("id is required");
+        }
         let schedule = args.get("schedule").and_then(|s| s.as_str());
         let prompt = args.get("prompt").and_then(|p| p.as_str());
         let status = args.get("status").and_then(|s| s.as_str());
@@ -73,13 +83,19 @@ impl Tool for CronUpdate {
             None => ToolResult::err("Automation manager not initialized"),
         }
     }
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait]
 impl Tool for CronDelete {
-    fn name(&self) -> &str { "cron_delete" }
-    fn description(&self) -> &str { "Delete a scheduled automation." }
+    fn name(&self) -> &str {
+        "cron_delete"
+    }
+    fn description(&self) -> &str {
+        "Delete a scheduled automation."
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {
@@ -89,31 +105,42 @@ impl Tool for CronDelete {
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let id = args.get("id").and_then(|i| i.as_str()).unwrap_or("");
-        if id.is_empty() { return ToolResult::err("id is required"); }
+        if id.is_empty() {
+            return ToolResult::err("id is required");
+        }
         match automation::with_automation(|mgr| mgr.delete(id)) {
             Some(true) => ToolResult::ok(format!("Deleted automation '{}'", id)),
             Some(false) => ToolResult::err(format!("Automation '{}' not found", id)),
             None => ToolResult::err("Automation manager not initialized"),
         }
     }
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[async_trait]
 impl Tool for CronList {
-    fn name(&self) -> &str { "cron_list" }
-    fn description(&self) -> &str { "List all scheduled automations." }
+    fn name(&self) -> &str {
+        "cron_list"
+    }
+    fn description(&self) -> &str {
+        "List all scheduled automations."
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {}, "additionalProperties": false
         })
     }
     async fn execute(&self, _args: serde_json::Value) -> ToolResult {
-        let output = automation::with_automation(|mgr| mgr.format_list())
-            .unwrap_or_else(|| "── Automations ──\n\nAutomation manager not initialized.".to_string());
+        let output = automation::with_automation(|mgr| mgr.format_list()).unwrap_or_else(|| {
+            "── Automations ──\n\nAutomation manager not initialized.".to_string()
+        });
         ToolResult::ok(output)
     }
-    fn requires_permission(&self) -> bool { false }
+    fn requires_permission(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
@@ -129,9 +156,11 @@ mod tests {
     async fn test_cron_create() {
         ensure_init();
         let tool = CronCreate;
-        let r = tool.execute(serde_json::json!({
-            "name": "test-job", "schedule": "0 9 * * *", "prompt": "Run daily report"
-        })).await;
+        let r = tool
+            .execute(serde_json::json!({
+                "name": "test-job", "schedule": "0 9 * * *", "prompt": "Run daily report"
+            }))
+            .await;
         assert!(r.success, "{}", r.error.as_deref().unwrap_or(""));
         assert!(r.output.contains("test-job"));
     }
@@ -148,9 +177,11 @@ mod tests {
     async fn test_cron_delete() {
         ensure_init();
         let create = CronCreate;
-        create.execute(serde_json::json!({
-            "name": "del-me", "schedule": "* * * * *", "prompt": "test"
-        })).await;
+        create
+            .execute(serde_json::json!({
+                "name": "del-me", "schedule": "* * * * *", "prompt": "test"
+            }))
+            .await;
 
         let del = CronDelete;
         let r = del.execute(serde_json::json!({"id": "del-me"})).await;

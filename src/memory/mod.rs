@@ -3,10 +3,10 @@
 //! Manages conversation memories stored as JSON files in ~/.coder/memory/,
 //! with keyword-based retrieval and background consolidation via AutoDream.
 
-pub mod store;
-pub mod retrieve;
 pub mod autodream;
+pub mod retrieve;
+pub mod store;
 
-pub use store::MemoryStore;
-pub use retrieve::MemoryRetrieval;
 pub use autodream::AutoDream;
+pub use retrieve::MemoryRetrieval;
+pub use store::MemoryStore;

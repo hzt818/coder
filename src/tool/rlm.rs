@@ -4,18 +4,24 @@
 //! AI provider, executes each sub-task as an independent LLM call, and
 //! aggregates the results.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use futures::future::join_all;
 
 pub struct RlmTool;
 
 #[async_trait]
 impl Tool for RlmTool {
-    fn name(&self) -> &str { "rlm" }
-    fn description(&self) -> &str { concat!("Recursive Language Model - fan out parallel LLM sub-queries. ",
-        "Accepts a prompt and optional sub-tasks, runs them in parallel (1-16), ",
-        "and returns aggregated results. Use for batch analysis, code review.") }
+    fn name(&self) -> &str {
+        "rlm"
+    }
+    fn description(&self) -> &str {
+        concat!(
+            "Recursive Language Model - fan out parallel LLM sub-queries. ",
+            "Accepts a prompt and optional sub-tasks, runs them in parallel (1-16), ",
+            "and returns aggregated results. Use for batch analysis, code review."
+        )
+    }
 
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
@@ -30,20 +36,34 @@ impl Tool for RlmTool {
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let prompt = args.get("prompt").and_then(|p| p.as_str()).unwrap_or("");
-        if prompt.is_empty() { return ToolResult::err("Prompt is required"); }
+        if prompt.is_empty() {
+            return ToolResult::err("Prompt is required");
+        }
 
-        let max_parallel = args.get("max_parallel").and_then(|m| m.as_i64()).unwrap_or(4);
+        let max_parallel = args
+            .get("max_parallel")
+            .and_then(|m| m.as_i64())
+            .unwrap_or(4);
         if max_parallel < 1 || max_parallel > 16 {
             return ToolResult::err("max_parallel must be between 1 and 16");
         }
 
-        let sub_tasks: Vec<String> = args.get("sub_tasks")
+        let sub_tasks: Vec<String> = args
+            .get("sub_tasks")
             .and_then(|s| s.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         let tasks = if sub_tasks.is_empty() {
-            vec!["Analyze".to_string(), "Identify issues".to_string(), "Suggest improvements".to_string()]
+            vec![
+                "Analyze".to_string(),
+                "Identify issues".to_string(),
+                "Suggest improvements".to_string(),
+            ]
         } else {
             sub_tasks
         };
@@ -53,10 +73,14 @@ impl Tool for RlmTool {
             .unwrap_or_default();
         let base_url = std::env::var("OPENAI_BASE_URL")
             .unwrap_or_else(|_| "https://api.openai.com/v1".to_string());
-        let model = args.get("model").and_then(|m| m.as_str())
+        let model = args
+            .get("model")
+            .and_then(|m| m.as_str())
             .filter(|m| *m != "auto")
             .map(|m| m.to_string())
-            .unwrap_or_else(|| std::env::var("CODER_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string()));
+            .unwrap_or_else(|| {
+                std::env::var("CODER_MODEL").unwrap_or_else(|_| "gpt-4o-mini".to_string())
+            });
 
         if api_key.is_empty() {
             let mut result = format!("🔁 RLM Analysis\nPrompt: {}\n\n", prompt);
@@ -72,7 +96,11 @@ impl Tool for RlmTool {
         let actual_parallel = tasks.len().min(max_parallel as usize);
         let mut result = format!("🔁 RLM Analysis\nPrompt: {}\n", prompt);
         result.push_str(&format!("Model: {}\n", model));
-        result.push_str(&format!("Tasks: {} (parallel: {})\n\n", tasks.len(), actual_parallel));
+        result.push_str(&format!(
+            "Tasks: {} (parallel: {})\n\n",
+            tasks.len(),
+            actual_parallel
+        ));
 
         let mut all_results: Vec<(usize, String, String)> = Vec::new();
 
@@ -105,7 +133,8 @@ impl Tool for RlmTool {
 
                     match &client {
                         Ok(c) => {
-                            let resp = c.post(&format!("{}/chat/completions", bu))
+                            let resp = c
+                                .post(&format!("{}/chat/completions", bu))
                                 .header("Authorization", format!("Bearer {}", ak))
                                 .header("Content-Type", "application/json")
                                 .json(&body)
@@ -116,7 +145,9 @@ impl Tool for RlmTool {
                                     match r.json::<serde_json::Value>().await {
                                         Ok(json) => {
                                             let text = json["choices"][0]["message"]["content"]
-                                                .as_str().unwrap_or("(no response)").to_string();
+                                                .as_str()
+                                                .unwrap_or("(no response)")
+                                                .to_string();
                                             (i, tn, text)
                                         }
                                         Err(e) => (i, tn, format!("Parse error: {}", e)),
@@ -125,7 +156,15 @@ impl Tool for RlmTool {
                                 Ok(r) => {
                                     let status = r.status();
                                     let body = r.text().await.unwrap_or_default();
-                                    (i, tn, format!("API error ({}): {}", status, body.lines().next().unwrap_or(&body)))
+                                    (
+                                        i,
+                                        tn,
+                                        format!(
+                                            "API error ({}): {}",
+                                            status,
+                                            body.lines().next().unwrap_or(&body)
+                                        ),
+                                    )
                                 }
                                 Err(e) => (i, tn, format!("Request failed: {}", e)),
                             }
@@ -141,25 +180,65 @@ impl Tool for RlmTool {
 
         all_results.sort_by_key(|r| r.0);
         for (idx, task_name, text) in &all_results {
-            result.push_str(&format!("── Result {}: {} ──\n{}\n\n", idx + 1, task_name, text));
+            result.push_str(&format!(
+                "── Result {}: {} ──\n{}\n\n",
+                idx + 1,
+                task_name,
+                text
+            ));
         }
 
         ToolResult::ok(result)
     }
 
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn test_name() { assert_eq!(RlmTool.name(), "rlm"); }
-    #[test] fn test_schema() { assert!(RlmTool.schema().get("properties").is_some()); }
-    #[tokio::test] async fn test_empty_prompt() { assert!(!RlmTool.execute(serde_json::json!({"prompt":""})).await.success); }
-    #[tokio::test] async fn test_max_parallel_low() { assert!(!RlmTool.execute(serde_json::json!({"prompt":"test","max_parallel":0})).await.success); }
-    #[tokio::test] async fn test_max_parallel_high() { assert!(!RlmTool.execute(serde_json::json!({"prompt":"test","max_parallel":17})).await.success); }
-    #[tokio::test] async fn test_valid_execution() {
-        let r = RlmTool.execute(serde_json::json!({"prompt":"analyze","max_parallel":2})).await;
+    #[test]
+    fn test_name() {
+        assert_eq!(RlmTool.name(), "rlm");
+    }
+    #[test]
+    fn test_schema() {
+        assert!(RlmTool.schema().get("properties").is_some());
+    }
+    #[tokio::test]
+    async fn test_empty_prompt() {
+        assert!(
+            !RlmTool
+                .execute(serde_json::json!({"prompt":""}))
+                .await
+                .success
+        );
+    }
+    #[tokio::test]
+    async fn test_max_parallel_low() {
+        assert!(
+            !RlmTool
+                .execute(serde_json::json!({"prompt":"test","max_parallel":0}))
+                .await
+                .success
+        );
+    }
+    #[tokio::test]
+    async fn test_max_parallel_high() {
+        assert!(
+            !RlmTool
+                .execute(serde_json::json!({"prompt":"test","max_parallel":17}))
+                .await
+                .success
+        );
+    }
+    #[tokio::test]
+    async fn test_valid_execution() {
+        let r = RlmTool
+            .execute(serde_json::json!({"prompt":"analyze","max_parallel":2}))
+            .await;
         assert!(r.success);
         assert!(r.output.contains("RLM Analysis"));
     }

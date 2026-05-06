@@ -7,8 +7,8 @@
 //! Each adapter implements the [`ImAdapter`] trait and runs as an
 //! independent message loop, relaying messages to the agent loop.
 
-pub mod telegram;
 pub mod feishu;
+pub mod telegram;
 
-pub use telegram::{ImAdapter, TelegramAdapter, TelegramConfig, TelegramMessage};
 pub use feishu::{FeishuAdapter, FeishuConfig};
+pub use telegram::{ImAdapter, TelegramAdapter, TelegramConfig, TelegramMessage};

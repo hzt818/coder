@@ -5,10 +5,10 @@
 //! - Request: `{"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`
 //! - SSE: `data: {"candidates":[{"content":{"parts":[{"text":"Hello"}],"role":"model"}}]}`
 
+use super::provider::{Provider, StreamHandler};
+use super::*;
 use async_trait::async_trait;
 use futures::StreamExt;
-use super::*;
-use super::provider::{Provider, StreamHandler};
 
 /// Google Gemini provider
 #[derive(Debug)]
@@ -66,15 +66,18 @@ impl Provider for GoogleProvider {
 
         // Add tool definitions if provided (Gemini function calling)
         if !tools.is_empty() {
-            body["tools"] = serde_json::json!(tools.iter().map(|t| {
-                serde_json::json!({
-                    "functionDeclarations": [{
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.input_schema,
-                    }]
+            body["tools"] = serde_json::json!(tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "functionDeclarations": [{
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.input_schema,
+                        }]
+                    })
                 })
-            }).collect::<Vec<_>>());
+                .collect::<Vec<_>>());
         }
 
         let url = format!(
@@ -109,49 +112,60 @@ impl Provider for GoogleProvider {
 
 /// Build text-only parts for user/system messages
 fn text_parts(msg: &Message) -> Vec<serde_json::Value> {
-    msg.content.iter().filter_map(|block| match block {
-        ContentBlock::Text { text } => {
-            Some(serde_json::json!({ "text": text }))
-        }
-        _ => None,
-    }).collect()
+    msg.content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::Text { text } => Some(serde_json::json!({ "text": text })),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Build parts for assistant messages, preserving functionCall blocks
 fn assistant_parts(msg: &Message) -> Vec<serde_json::Value> {
-    msg.content.iter().map(|block| match block {
-        ContentBlock::Text { text } => {
-            serde_json::json!({ "text": text })
-        }
-        ContentBlock::ToolUse { name, input, .. } => {
-            serde_json::json!({
-                "functionCall": {
-                    "name": name,
-                    "args": input,
-                }
-            })
-        }
-        _ => serde_json::Value::Null,
-    }).filter(|v| !v.is_null()).collect()
+    msg.content
+        .iter()
+        .map(|block| match block {
+            ContentBlock::Text { text } => {
+                serde_json::json!({ "text": text })
+            }
+            ContentBlock::ToolUse { name, input, .. } => {
+                serde_json::json!({
+                    "functionCall": {
+                        "name": name,
+                        "args": input,
+                    }
+                })
+            }
+            _ => serde_json::Value::Null,
+        })
+        .filter(|v| !v.is_null())
+        .collect()
 }
 
 /// Build parts for tool result messages (functionResponse in Gemini)
 fn tool_result_parts(msg: &Message) -> Vec<serde_json::Value> {
-    msg.content.iter().filter_map(|block| match block {
-        ContentBlock::ToolResult { tool_use_id, content } => {
-            // Gemini uses the function name, not tool_use_id; extract from adjacent ToolUse
-            // Fallback: use tool_use_id as name
-            Some(serde_json::json!({
-                "functionResponse": {
-                    "name": tool_use_id,
-                    "response": {
-                        "content": content,
+    msg.content
+        .iter()
+        .filter_map(|block| match block {
+            ContentBlock::ToolResult {
+                tool_use_id,
+                content,
+            } => {
+                // Gemini uses the function name, not tool_use_id; extract from adjacent ToolUse
+                // Fallback: use tool_use_id as name
+                Some(serde_json::json!({
+                    "functionResponse": {
+                        "name": tool_use_id,
+                        "response": {
+                            "content": content,
+                        }
                     }
-                }
-            }))
-        }
-        _ => None,
-    }).collect()
+                }))
+            }
+            _ => None,
+        })
+        .collect()
 }
 
 /// Parse a Gemini SSE stream.
@@ -201,11 +215,7 @@ async fn parse_gemini_sse(
                     match serde_json::from_str::<serde_json::Value>(data) {
                         Ok(json) => process_gemini_data(json, &tx).await,
                         Err(e) => {
-                            tracing::warn!(
-                                "Failed to parse Gemini SSE JSON: {} - {}",
-                                e,
-                                data
-                            );
+                            tracing::warn!("Failed to parse Gemini SSE JSON: {} - {}", e, data);
                         }
                     }
                 }
@@ -221,10 +231,7 @@ async fn parse_gemini_sse(
 /// Extracts text from `candidates[0].content.parts[*].text` and emits
 /// `StreamEvent::TextChunk`. When `candidates[0].finish_reason` is present,
 /// emits `StreamEvent::Done` with the finish reason and optional usage info.
-async fn process_gemini_data(
-    json: serde_json::Value,
-    tx: &tokio::sync::mpsc::Sender<StreamEvent>,
-) {
+async fn process_gemini_data(json: serde_json::Value, tx: &tokio::sync::mpsc::Sender<StreamEvent>) {
     let candidates = match json.get("candidates").and_then(|c| c.as_array()) {
         Some(c) => c,
         None => return,
@@ -295,13 +302,13 @@ async fn process_gemini_data(
             let name = fc.get("name").and_then(|n| n.as_str()).unwrap_or("unknown");
             let args = fc.get("args").cloned().unwrap_or(serde_json::json!({}));
             let id = format!("fc_{}", name);
-            let _ = tx.send(StreamEvent::ToolCallStart(
-                crate::ai::ToolCall {
+            let _ = tx
+                .send(StreamEvent::ToolCallStart(crate::ai::ToolCall {
                     id,
                     name: name.to_string(),
                     arguments: args,
-                }
-            )).await;
+                }))
+                .await;
         }
     }
 }

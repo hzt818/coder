@@ -20,10 +20,7 @@ use super::AppState;
 /// Accepts an upgrade request and spawns a handler task for the
 /// connection.  The handler reads JSON messages from the client and
 /// streams back events.
-pub async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<AppState>>,
-) -> Response {
+pub async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 

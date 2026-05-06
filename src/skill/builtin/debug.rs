@@ -86,7 +86,8 @@ fn generate_hypotheses(symptom: &str) -> Vec<Hypothesis> {
             },
             Hypothesis {
                 name: "Logic error in business rules".into(),
-                test: "Trace through the code path with the specific inputs that trigger the bug".into(),
+                test: "Trace through the code path with the specific inputs that trigger the bug"
+                    .into(),
             },
             Hypothesis {
                 name: "Timing or race condition".into(),
@@ -163,7 +164,12 @@ impl Skill for DebugSkill {
         output.push_str("## Step 2: Form Hypotheses\n\n");
         let hypotheses = generate_hypotheses(symptom);
         for (i, h) in hypotheses.iter().enumerate() {
-            output.push_str(&format!("{}. **{}**\n   - *Test:* {}\n", i + 1, h.name, h.test));
+            output.push_str(&format!(
+                "{}. **{}**\n   - *Test:* {}\n",
+                i + 1,
+                h.name,
+                h.test
+            ));
         }
         output.push_str("\n");
 

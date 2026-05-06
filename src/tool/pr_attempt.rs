@@ -3,8 +3,8 @@
 //! Provides record/list/read/preflight operations for tracking
 //! patch attempts associated with tasks.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::sync::Mutex;
 
 /// A recorded PR attempt
@@ -92,16 +92,16 @@ impl Tool for PrAttemptTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let operation = args
-            .get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let operation = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
         match operation {
             "record" => {
                 let task_id = args.get("task_id").and_then(|t| t.as_str()).unwrap_or("");
                 let patch = args.get("patch").and_then(|p| p.as_str()).unwrap_or("");
-                let description = args.get("description").and_then(|d| d.as_str()).unwrap_or("");
+                let description = args
+                    .get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("");
 
                 if task_id.is_empty() {
                     return ToolResult::err("'task_id' is required for record");
@@ -149,7 +149,11 @@ impl Tool for PrAttemptTool {
                 let items: Vec<&PrAttempt> = if task_id.is_empty() {
                     state.items.iter().collect()
                 } else {
-                    state.items.iter().filter(|a| a.task_id == task_id).collect()
+                    state
+                        .items
+                        .iter()
+                        .filter(|a| a.task_id == task_id)
+                        .collect()
                 };
 
                 if items.is_empty() {
@@ -228,7 +232,10 @@ impl Tool for PrAttemptTool {
                 ToolResult::ok(format!(
                     "Preflight passed: patch applies cleanly ({} lines, {} diff headers, {} hunks)",
                     patch_lines.len(),
-                    patch_lines.iter().filter(|l| l.starts_with("diff --git")).count(),
+                    patch_lines
+                        .iter()
+                        .filter(|l| l.starts_with("diff --git"))
+                        .count(),
                     patch_lines.iter().filter(|l| l.starts_with("@@")).count()
                 ))
             }
@@ -313,9 +320,7 @@ mod tests {
     #[tokio::test]
     async fn test_pr_attempt_list_all() {
         let tool = PrAttemptTool;
-        let result = tool
-            .execute(serde_json::json!({"operation": "list"}))
-            .await;
+        let result = tool.execute(serde_json::json!({"operation": "list"})).await;
         assert!(result.success);
     }
 
@@ -367,9 +372,7 @@ mod tests {
     #[tokio::test]
     async fn test_pr_attempt_empty_args() {
         let tool = PrAttemptTool;
-        let result = tool
-            .execute(serde_json::json!({}))
-            .await;
+        let result = tool.execute(serde_json::json!({})).await;
         assert!(!result.success);
     }
 }

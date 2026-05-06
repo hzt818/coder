@@ -1,7 +1,7 @@
 //! Provider trait - the core interface for AI providers
 
-use async_trait::async_trait;
 use super::types::*;
+use async_trait::async_trait;
 
 /// Result type for stream handlers
 pub type StreamHandler = tokio::sync::mpsc::Receiver<StreamEvent>;

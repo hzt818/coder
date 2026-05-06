@@ -83,7 +83,10 @@ mod tests {
     #[test]
     fn test_sync_direction_display() {
         assert_eq!(format!("{:?}", SyncDirection::Upload), "Upload");
-        assert_eq!(format!("{:?}", SyncDirection::Bidirectional), "Bidirectional");
+        assert_eq!(
+            format!("{:?}", SyncDirection::Bidirectional),
+            "Bidirectional"
+        );
     }
 
     #[test]

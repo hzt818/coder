@@ -19,24 +19,24 @@
 //! └─────────────────────────────────────────────┘
 
 pub mod app;
-pub mod ui;
 pub mod chat_panel;
-pub mod input;
-pub mod status_bar;
-pub mod detail_popup;
-pub mod mention_popup;
-pub mod help;
 pub mod command_palette;
-pub mod theme;
-pub mod syntax;
+pub mod detail_popup;
 pub mod dialog_provider_setup;
+pub mod help;
+pub mod input;
+pub mod mention_popup;
+pub mod status_bar;
+pub mod syntax;
+pub mod theme;
+pub mod ui;
 pub mod vim;
 
 pub use app::App;
 
 use anyhow::Result;
-use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use ratatui::Terminal;
 use std::io::stdout;
 
 /// Initialize the terminal for TUI mode

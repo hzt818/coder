@@ -2,8 +2,8 @@
 //!
 //! Uses reqwest to query web search engines and return results.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct WebSearchTool;
 
@@ -42,19 +42,19 @@ impl Tool for WebSearchTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let query = args.get("query")
-            .and_then(|q| q.as_str())
-            .unwrap_or("");
+        let query = args.get("query").and_then(|q| q.as_str()).unwrap_or("");
 
         if query.is_empty() {
             return ToolResult::err("Query is required");
         }
 
-        let max_results = args.get("max_results")
+        let max_results = args
+            .get("max_results")
             .and_then(|m| m.as_u64())
             .unwrap_or(5) as usize;
 
-        let engine = args.get("engine")
+        let engine = args
+            .get("engine")
             .and_then(|e| e.as_str())
             .unwrap_or("auto");
 
@@ -72,8 +72,11 @@ async fn search_web_multi(query: &str, max_results: usize, engine: &str) -> Resu
         _ => {
             // Try DuckDuckGo first, fall back to HTML scrape
             let ddg = search_duckduckgo(query, max_results).await;
-            if ddg.is_ok() { ddg }
-            else { search_duckduckgo_html(query, max_results).await }
+            if ddg.is_ok() {
+                ddg
+            } else {
+                search_duckduckgo_html(query, max_results).await
+            }
         }
     }
 }
@@ -81,8 +84,10 @@ async fn search_web_multi(query: &str, max_results: usize, engine: &str) -> Resu
 /// Search using DuckDuckGo instant answer API (no API key needed)
 async fn search_duckduckgo(query: &str, max_results: usize) -> Result<String, String> {
     let encoded: String = url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
-    let url = format!("https://api.duckduckgo.com/?q={}&format=json&no_html=1&skip_disambig=1",
-        encoded);
+    let url = format!(
+        "https://api.duckduckgo.com/?q={}&format=json&no_html=1&skip_disambig=1",
+        encoded
+    );
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
@@ -90,7 +95,8 @@ async fn search_duckduckgo(query: &str, max_results: usize) -> Result<String, St
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
-    let response = client.get(&url)
+    let response = client
+        .get(&url)
         .send()
         .await
         .map_err(|e| format!("Search request failed: {}", e))?;
@@ -154,9 +160,14 @@ async fn search_duckduckgo_html(query: &str, max_results: usize) -> Result<Strin
         .build()
         .map_err(|e| format!("Client error: {}", e))?;
 
-    let response = client.get(&url).send().await
+    let response = client
+        .get(&url)
+        .send()
+        .await
         .map_err(|e| format!("Request failed: {}", e))?;
-    let body = response.text().await
+    let body = response
+        .text()
+        .await
         .map_err(|e| format!("Body read failed: {}", e))?;
 
     // Extract result links using simple HTML parsing
@@ -164,38 +175,57 @@ async fn search_duckduckgo_html(query: &str, max_results: usize) -> Result<Strin
     let mut count = 0;
 
     for line in body.lines() {
-        if count >= max_results { break; }
+        if count >= max_results {
+            break;
+        }
         let trimmed = line.trim();
         if let Some(url_start) = trimmed.find("uddg=") {
             let url_end = trimmed[url_start + 5..].find('"').unwrap_or(0);
             let found_url = &trimmed[url_start + 5..url_start + 5 + url_end];
             // Find the result title
-            let title = trimmed.split('>').nth(1).unwrap_or("").split('<').next().unwrap_or("");
+            let title = trimmed
+                .split('>')
+                .nth(1)
+                .unwrap_or("")
+                .split('<')
+                .next()
+                .unwrap_or("");
             if !title.is_empty() {
                 count += 1;
-                result.push_str(&format!("{}. {} - {}\n", count, html_unescape(title), found_url));
+                result.push_str(&format!(
+                    "{}. {} - {}\n",
+                    count,
+                    html_unescape(title),
+                    found_url
+                ));
             }
         }
     }
 
-    if count == 0 { result.push_str("(No results found.)"); }
+    if count == 0 {
+        result.push_str("(No results found.)");
+    }
     Ok(result)
 }
 
 /// Search using Brave Search API (requires BRAVE_API_KEY env var)
 async fn search_brave(query: &str, max_results: usize) -> Result<String, String> {
-    let api_key = std::env::var("BRAVE_API_KEY")
-        .map_err(|_| "BRAVE_API_KEY not set".to_string())?;
+    let api_key =
+        std::env::var("BRAVE_API_KEY").map_err(|_| "BRAVE_API_KEY not set".to_string())?;
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .map_err(|e| format!("Client error: {}", e))?;
 
-    let url = format!("https://api.search.brave.com/res/v1/web/search?q={}&count={}",
-        url::form_urlencoded::byte_serialize(query.as_bytes()).collect::<String>(), max_results);
+    let url = format!(
+        "https://api.search.brave.com/res/v1/web/search?q={}&count={}",
+        url::form_urlencoded::byte_serialize(query.as_bytes()).collect::<String>(),
+        max_results
+    );
 
-    let response = client.get(&url)
+    let response = client
+        .get(&url)
         .header("Accept", "application/json")
         .header("Accept-Encoding", "gzip")
         .header("X-Subscription-Token", &api_key)
@@ -203,15 +233,24 @@ async fn search_brave(query: &str, max_results: usize) -> Result<String, String>
         .await
         .map_err(|e| format!("Brave request failed: {}", e))?;
 
-    let data: serde_json::Value = response.json().await
+    let data: serde_json::Value = response
+        .json()
+        .await
         .map_err(|e| format!("Parse failed: {}", e))?;
 
     let mut result = format!("Search results for: {}\n\n", query);
-    if let Some(web) = data.get("web").and_then(|w| w.get("results")).and_then(|r| r.as_array()) {
+    if let Some(web) = data
+        .get("web")
+        .and_then(|w| w.get("results"))
+        .and_then(|r| r.as_array())
+    {
         for (i, item) in web.iter().take(max_results).enumerate() {
             let title = item.get("title").and_then(|t| t.as_str()).unwrap_or("");
             let url = item.get("url").and_then(|u| u.as_str()).unwrap_or("");
-            let desc = item.get("description").and_then(|d| d.as_str()).unwrap_or("");
+            let desc = item
+                .get("description")
+                .and_then(|d| d.as_str())
+                .unwrap_or("");
             result.push_str(&format!("{}. {} - {}\n   {}\n\n", i + 1, title, url, desc));
         }
     }
@@ -220,8 +259,11 @@ async fn search_brave(query: &str, max_results: usize) -> Result<String, String>
 
 /// Simple HTML entity unescape
 fn html_unescape(s: &str) -> String {
-    s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-        .replace("&quot;", "\"").replace("&#39;", "'")
+    s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
 }
 
 #[cfg(test)]

@@ -3,8 +3,8 @@
 //! Scans session cycle archives and returns top-N matching messages
 //! scored with BM25 (standard K1=1.5, B=0.75). No external dependencies.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::collections::HashMap;
 
 const DEFAULT_MAX_RESULTS: usize = 3;
@@ -16,7 +16,9 @@ pub struct RecallTool;
 
 #[async_trait]
 impl Tool for RecallTool {
-    fn name(&self) -> &str { "recall" }
+    fn name(&self) -> &str {
+        "recall"
+    }
     fn description(&self) -> &str {
         "Search prior session content using BM25 ranking. Use when you need information from earlier in the conversation."
     }
@@ -29,9 +31,20 @@ impl Tool for RecallTool {
         })
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let query = args.get("query").and_then(|q| q.as_str()).unwrap_or("").trim().to_string();
-        if query.is_empty() { return ToolResult::err("Query is required"); }
-        let max_results = args.get("max_results").and_then(|m| m.as_u64()).unwrap_or(DEFAULT_MAX_RESULTS as u64).clamp(1, HARD_MAX_RESULTS as u64) as usize;
+        let query = args
+            .get("query")
+            .and_then(|q| q.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if query.is_empty() {
+            return ToolResult::err("Query is required");
+        }
+        let max_results = args
+            .get("max_results")
+            .and_then(|m| m.as_u64())
+            .unwrap_or(DEFAULT_MAX_RESULTS as u64)
+            .clamp(1, HARD_MAX_RESULTS as u64) as usize;
 
         // Try to load recent session files and search their content
         let session_dir = crate::util::path::coder_dir().join("sessions");
@@ -64,7 +77,13 @@ impl Tool for RecallTool {
         hits.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         let mut result = format!("── Recall Results (top {}) ──\n\n", max_results);
         for (i, (score, path, excerpt)) in hits.iter().take(max_results).enumerate() {
-            result.push_str(&format!("{}. [score: {:.2}] {}\n   {}\n\n", i + 1, score, path, excerpt));
+            result.push_str(&format!(
+                "{}. [score: {:.2}] {}\n   {}\n\n",
+                i + 1,
+                score,
+                path,
+                excerpt
+            ));
         }
         ToolResult::ok(result)
     }
@@ -72,18 +91,26 @@ impl Tool for RecallTool {
 
 /// Simple whitespace tokenizer.
 fn tokenize(text: &str) -> Vec<String> {
-    text.to_lowercase().split_whitespace()
+    text.to_lowercase()
+        .split_whitespace()
         .map(|t| t.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
         .filter(|t| !t.is_empty() && t.len() > 2)
         .collect()
 }
 
 /// Compute BM25 score for query terms against a document.
-fn bm25_score(query_terms: &[String], doc_terms: &[String], _idf: &HashMap<String, f64>, _avg_dl: f64, _num_docs: usize) -> f64 {
+fn bm25_score(
+    query_terms: &[String],
+    doc_terms: &[String],
+    _idf: &HashMap<String, f64>,
+    _avg_dl: f64,
+    _num_docs: usize,
+) -> f64 {
     let mut score = 0.0;
     let doc_len = doc_terms.len() as f64;
     let term_freq: HashMap<&str, usize> = doc_terms.iter().fold(HashMap::new(), |mut acc, t| {
-        *acc.entry(t.as_str()).or_insert(0) += 1; acc
+        *acc.entry(t.as_str()).or_insert(0) += 1;
+        acc
     });
 
     for term in query_terms {
@@ -100,8 +127,14 @@ fn bm25_score(query_terms: &[String], doc_terms: &[String], _idf: &HashMap<Strin
 mod tests {
     use super::*;
 
-    #[test] fn test_name() { assert_eq!(RecallTool.name(), "recall"); }
-    #[tokio::test] async fn test_empty_query() { assert!(!RecallTool.execute(serde_json::json!({})).await.success); }
+    #[test]
+    fn test_name() {
+        assert_eq!(RecallTool.name(), "recall");
+    }
+    #[tokio::test]
+    async fn test_empty_query() {
+        assert!(!RecallTool.execute(serde_json::json!({})).await.success);
+    }
 
     #[test]
     fn test_tokenize() {

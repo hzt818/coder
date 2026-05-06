@@ -3,8 +3,8 @@
 //! Provides a structured directory listing that respects .gitignore files.
 //! Preferred over `ls` shell command for better structured output.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::path::Path;
 
 pub struct ListDirTool;
@@ -53,25 +53,16 @@ impl Tool for ListDirTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let path = args
-            .get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or(".");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or(".");
 
-        let max_depth = args
-            .get("max_depth")
-            .and_then(|d| d.as_i64())
-            .unwrap_or(1) as usize;
+        let max_depth = args.get("max_depth").and_then(|d| d.as_i64()).unwrap_or(1) as usize;
 
         let show_hidden = args
             .get("show_hidden")
             .and_then(|s| s.as_bool())
             .unwrap_or(false);
 
-        let pattern = args
-            .get("pattern")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let pattern = args.get("pattern").and_then(|p| p.as_str()).unwrap_or("");
 
         let dir_path = Path::new(path);
         if !dir_path.exists() {
@@ -105,14 +96,23 @@ fn list_directory(
     pattern: &str,
 ) -> Result<String, String> {
     let mut output = String::new();
-    let canonical = std::fs::canonicalize(dir)
-        .map_err(|e| format!("Failed to canonicalize path: {}", e))?;
+    let canonical =
+        std::fs::canonicalize(dir).map_err(|e| format!("Failed to canonicalize path: {}", e))?;
 
     output.push_str(&format!("Directory: {}\n\n", canonical.display()));
 
     let mut entries: Vec<DirEntry> = Vec::new();
-    let mut visited_dirs: std::collections::HashSet<std::path::PathBuf> = std::collections::HashSet::new();
-    collect_entries(dir, 0, max_depth, show_hidden, pattern, &mut entries, &mut visited_dirs)?;
+    let mut visited_dirs: std::collections::HashSet<std::path::PathBuf> =
+        std::collections::HashSet::new();
+    collect_entries(
+        dir,
+        0,
+        max_depth,
+        show_hidden,
+        pattern,
+        &mut entries,
+        &mut visited_dirs,
+    )?;
 
     if entries.is_empty() {
         output.push_str("(empty directory)");
@@ -168,7 +168,9 @@ fn list_directory(
 
     output.push_str(&format!(
         "\n{} files, {} directories ({} total)",
-        file_count, dir_count, format_size(total_size)
+        file_count,
+        dir_count,
+        format_size(total_size)
     ));
 
     Ok(output)
@@ -221,7 +223,9 @@ fn collect_entries(
             }
         }
 
-        let file_type = entry.file_type().map_err(|e| format!("File type error: {}", e))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|e| format!("File type error: {}", e))?;
         let is_dir = file_type.is_dir();
         let is_symlink = file_type.is_symlink();
         let metadata = entry.metadata().ok();
@@ -230,9 +234,7 @@ fn collect_entries(
         let modified = metadata
             .and_then(|m| m.modified().ok())
             .map(|t| {
-                let duration = t
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default();
+                let duration = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
                 let secs = duration.as_secs();
                 // Format as relative time
                 let now = std::time::SystemTime::now()
@@ -278,7 +280,15 @@ fn collect_entries(
 
         // Recurse into subdirectories (skip symlinks to avoid cycles)
         if is_dir && depth < max_depth {
-            collect_entries(&entry.path(), depth + 1, max_depth, show_hidden, pattern, entries, visited_dirs)?;
+            collect_entries(
+                &entry.path(),
+                depth + 1,
+                max_depth,
+                show_hidden,
+                pattern,
+                entries,
+                visited_dirs,
+            )?;
         }
     }
 
@@ -343,9 +353,7 @@ mod tests {
     async fn test_list_dir_file_path() {
         let tool = ListDirTool;
         let tmp = tempfile::NamedTempFile::new().unwrap();
-        let result = tool
-            .execute(serde_json::json!({"path": tmp.path()}))
-            .await;
+        let result = tool.execute(serde_json::json!({"path": tmp.path()})).await;
         assert!(!result.success); // Not a directory
     }
 

@@ -2,8 +2,8 @@
 //!
 //! Supports checking CI status, listing workflows, and triggering workflow runs.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct CiTool;
 
@@ -52,26 +52,28 @@ impl Tool for CiTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let operation = args.get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let operation = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
-        let repo = args.get("repo")
+        let repo = args
+            .get("repo")
             .and_then(|r| r.as_str())
             .unwrap_or("")
             .to_string();
 
-        let workflow = args.get("workflow")
+        let workflow = args
+            .get("workflow")
             .and_then(|w| w.as_str())
             .unwrap_or("")
             .to_string();
 
-        let branch = args.get("branch")
+        let branch = args
+            .get("branch")
             .and_then(|b| b.as_str())
             .unwrap_or("")
             .to_string();
 
-        let run_id = args.get("run_id")
+        let run_id = args
+            .get("run_id")
             .and_then(|r| r.as_str())
             .unwrap_or("")
             .to_string();
@@ -85,7 +87,12 @@ impl Tool for CiTool {
             "workflows" => ci_list_workflows(&repo).await,
             "trigger" => ci_trigger(&repo, &workflow, &branch).await,
             "status" => ci_status(&repo, &run_id).await,
-            _ => return ToolResult::err(format!("Unknown CI operation: '{}'. Use: check, workflows, trigger, status", operation)),
+            _ => {
+                return ToolResult::err(format!(
+                    "Unknown CI operation: '{}'. Use: check, workflows, trigger, status",
+                    operation
+                ))
+            }
         };
 
         match result {
@@ -103,7 +110,9 @@ impl Tool for CiTool {
 fn get_github_token() -> Result<String, String> {
     std::env::var("GITHUB_TOKEN")
         .or_else(|_| std::env::var("GH_TOKEN"))
-        .map_err(|_| "GitHub token not found. Set GITHUB_TOKEN or GH_TOKEN environment variable.".to_string())
+        .map_err(|_| {
+            "GitHub token not found. Set GITHUB_TOKEN or GH_TOKEN environment variable.".to_string()
+        })
 }
 
 /// Create a GitHub API client
@@ -119,7 +128,8 @@ fn create_github_client() -> Result<reqwest::Client, String> {
 async fn github_get(url: &str, token: &str) -> Result<serde_json::Value, String> {
     let client = create_github_client()?;
 
-    let response = client.get(url)
+    let response = client
+        .get(url)
         .header("Authorization", format!("Bearer {}", token))
         .header("Accept", "application/vnd.github+json")
         .send()
@@ -130,7 +140,9 @@ async fn github_get(url: &str, token: &str) -> Result<serde_json::Value, String>
         return Err(format!("GitHub API returned HTTP {}", response.status()));
     }
 
-    response.json().await
+    response
+        .json()
+        .await
         .map_err(|e| format!("Failed to parse response: {}", e))
 }
 
@@ -159,10 +171,19 @@ async fn ci_check(repo: &str, branch: &str) -> Result<String, String> {
             result.push_str("No workflow runs found.");
         } else {
             for run in runs {
-                let name = run.get("name").and_then(|n| n.as_str()).unwrap_or("Unknown");
+                let name = run
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("Unknown");
                 let status = run.get("status").and_then(|s| s.as_str()).unwrap_or("?");
-                let conclusion = run.get("conclusion").and_then(|c| c.as_str()).unwrap_or("?");
-                let branch_name = run.get("head_branch").and_then(|b| b.as_str()).unwrap_or("?");
+                let conclusion = run
+                    .get("conclusion")
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("?");
+                let branch_name = run
+                    .get("head_branch")
+                    .and_then(|b| b.as_str())
+                    .unwrap_or("?");
                 let html_url = run.get("html_url").and_then(|u| u.as_str()).unwrap_or("");
 
                 let status_icon = match conclusion {
@@ -171,7 +192,10 @@ async fn ci_check(repo: &str, branch: &str) -> Result<String, String> {
                     _ => "PEND",
                 };
 
-                result.push_str(&format!("  [{}] {} (branch: {})\n", status_icon, name, branch_name));
+                result.push_str(&format!(
+                    "  [{}] {} (branch: {})\n",
+                    status_icon, name, branch_name
+                ));
                 result.push_str(&format!("       Status: {} - {}\n", status, conclusion));
                 if !html_url.is_empty() {
                     result.push_str(&format!("       URL: {}\n", html_url));
@@ -234,13 +258,17 @@ async fn ci_trigger(repo: &str, workflow: &str, branch: &str) -> Result<String, 
     let token = get_github_token()?;
     let client = create_github_client()?;
 
-    let url = format!("https://api.github.com/repos/{}/actions/workflows/{}/dispatches", repo, workflow);
+    let url = format!(
+        "https://api.github.com/repos/{}/actions/workflows/{}/dispatches",
+        repo, workflow
+    );
 
     let payload = serde_json::json!({
         "ref": branch
     });
 
-    let response = client.post(&url)
+    let response = client
+        .post(&url)
         .header("Authorization", format!("Bearer {}", token))
         .header("Accept", "application/vnd.github+json")
         .json(&payload)
@@ -249,9 +277,15 @@ async fn ci_trigger(repo: &str, workflow: &str, branch: &str) -> Result<String, 
         .map_err(|e| format!("Failed to trigger workflow: {}", e))?;
 
     if response.status().is_success() || response.status().as_u16() == 204 {
-        Ok(format!("Successfully triggered workflow '{}' on branch '{}'", workflow, branch))
+        Ok(format!(
+            "Successfully triggered workflow '{}' on branch '{}'",
+            workflow, branch
+        ))
     } else {
-        Err(format!("Failed to trigger workflow: HTTP {}", response.status()))
+        Err(format!(
+            "Failed to trigger workflow: HTTP {}",
+            response.status()
+        ))
     }
 }
 
@@ -262,13 +296,25 @@ async fn ci_status(repo: &str, run_id: &str) -> Result<String, String> {
     }
 
     let token = get_github_token()?;
-    let url = format!("https://api.github.com/repos/{}/actions/runs/{}", repo, run_id);
+    let url = format!(
+        "https://api.github.com/repos/{}/actions/runs/{}",
+        repo, run_id
+    );
     let body = github_get(&url, &token).await?;
 
-    let name = body.get("name").and_then(|n| n.as_str()).unwrap_or("Unknown");
+    let name = body
+        .get("name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("Unknown");
     let status = body.get("status").and_then(|s| s.as_str()).unwrap_or("?");
-    let conclusion = body.get("conclusion").and_then(|c| c.as_str()).unwrap_or("?");
-    let branch = body.get("head_branch").and_then(|b| b.as_str()).unwrap_or("?");
+    let conclusion = body
+        .get("conclusion")
+        .and_then(|c| c.as_str())
+        .unwrap_or("?");
+    let branch = body
+        .get("head_branch")
+        .and_then(|b| b.as_str())
+        .unwrap_or("?");
     let html_url = body.get("html_url").and_then(|u| u.as_str()).unwrap_or("");
 
     let mut result = format!("Run #{}: {}\n", run_id, name);
@@ -349,14 +395,18 @@ mod tests {
     #[tokio::test]
     async fn test_ci_invalid_operation() {
         let tool = CiTool;
-        let result = tool.execute(serde_json::json!({"operation": "bogus"})).await;
+        let result = tool
+            .execute(serde_json::json!({"operation": "bogus"}))
+            .await;
         assert!(!result.success);
     }
 
     #[tokio::test]
     async fn test_ci_check_no_token() {
         let tool = CiTool;
-        let result = tool.execute(serde_json::json!({"operation": "check", "repo": "user/repo"})).await;
+        let result = tool
+            .execute(serde_json::json!({"operation": "check", "repo": "user/repo"}))
+            .await;
         // Without token, should fail gracefully
         assert!(!result.success);
     }

@@ -31,7 +31,10 @@ impl TaskStatus {
     }
 
     pub fn is_terminal(&self) -> bool {
-        matches!(self, TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Canceled)
+        matches!(
+            self,
+            TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Canceled
+        )
     }
 }
 
@@ -157,8 +160,17 @@ impl TaskManager {
     }
 
     /// Update task status
-    pub fn update_status(&mut self, id: &str, status: TaskStatus, result: Option<String>, error: Option<String>) -> anyhow::Result<()> {
-        let task = self.tasks.iter_mut().find(|t| t.id == id)
+    pub fn update_status(
+        &mut self,
+        id: &str,
+        status: TaskStatus,
+        result: Option<String>,
+        error: Option<String>,
+    ) -> anyhow::Result<()> {
+        let task = self
+            .tasks
+            .iter_mut()
+            .find(|t| t.id == id)
             .ok_or_else(|| anyhow::anyhow!("Task '{}' not found", id))?;
 
         task.status = status.as_str().to_string();
@@ -179,12 +191,18 @@ impl TaskManager {
 
     /// Cancel a task
     pub fn cancel_task(&mut self, id: &str) -> anyhow::Result<()> {
-        self.update_status(id, TaskStatus::Canceled, None, Some("Canceled by user".to_string()))
+        self.update_status(
+            id,
+            TaskStatus::Canceled,
+            None,
+            Some("Canceled by user".to_string()),
+        )
     }
 
     /// Delete all completed/failed/canceled tasks
     pub fn clear_completed(&mut self) {
-        self.tasks.retain(|t| t.status == "queued" || t.status == "running");
+        self.tasks
+            .retain(|t| t.status == "queued" || t.status == "running");
         self.save_to_disk();
     }
 
@@ -218,7 +236,10 @@ impl TaskManager {
 
     /// Get events for a task
     pub fn get_events(&self, task_id: &str) -> Vec<TaskEvent> {
-        let events_path = self.tasks_dir.join("events").join(format!("{}.jsonl", task_id));
+        let events_path = self
+            .tasks_dir
+            .join("events")
+            .join(format!("{}.jsonl", task_id));
         if !events_path.exists() {
             return Vec::new();
         }
@@ -254,7 +275,10 @@ pub fn get_task(id: &str) -> Option<TaskRecord> {
 
 pub fn cancel_task(id: &str) -> anyhow::Result<()> {
     let mut guard = TASK_MANAGER.lock().unwrap();
-    guard.as_mut().ok_or_else(|| anyhow::anyhow!("Task manager not initialized"))?.cancel_task(id)
+    guard
+        .as_mut()
+        .ok_or_else(|| anyhow::anyhow!("Task manager not initialized"))?
+        .cancel_task(id)
 }
 
 /// Format tasks for display
@@ -293,7 +317,10 @@ pub fn format_task_list(tasks: &[TaskRecord]) -> String {
             task.prompt.clone()
         };
 
-        result.push_str(&format!("  {} [{}] {} - {}\n", icon, id_short, task.status, prompt_short));
+        result.push_str(&format!(
+            "  {} [{}] {} - {}\n",
+            icon, id_short, task.status, prompt_short
+        ));
     }
 
     if tasks.len() > 20 {
@@ -354,7 +381,14 @@ mod tests {
         let mut manager = TaskManager::new(Some(tmp.path().to_path_buf()));
 
         let task = manager.create_task("test");
-        assert!(manager.update_status(&task.id, TaskStatus::Completed, Some("done".to_string()), None).is_ok());
+        assert!(manager
+            .update_status(
+                &task.id,
+                TaskStatus::Completed,
+                Some("done".to_string()),
+                None
+            )
+            .is_ok());
 
         let updated = manager.get_task(&task.id).unwrap();
         assert_eq!(updated.status, "completed");
@@ -405,18 +439,16 @@ mod tests {
 
     #[test]
     fn test_format_task_list_with_entries() {
-        let tasks = vec![
-            TaskRecord {
-                id: "abc12345-1234-1234-1234-123456789abc".to_string(),
-                prompt: "test task prompt here".to_string(),
-                status: "queued".to_string(),
-                created_at: "2026-01-01T00:00:00Z".to_string(),
-                updated_at: "2026-01-01T00:00:00Z".to_string(),
-                result: None,
-                error: None,
-                metadata: std::collections::HashMap::new(),
-            },
-        ];
+        let tasks = vec![TaskRecord {
+            id: "abc12345-1234-1234-1234-123456789abc".to_string(),
+            prompt: "test task prompt here".to_string(),
+            status: "queued".to_string(),
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+            updated_at: "2026-01-01T00:00:00Z".to_string(),
+            result: None,
+            error: None,
+            metadata: std::collections::HashMap::new(),
+        }];
         let result = format_task_list(&tasks);
         assert!(result.contains("test task"));
         assert!(result.contains("1 queued"));

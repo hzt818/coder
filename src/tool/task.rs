@@ -1,7 +1,7 @@
 //! Task tool - task management
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::sync::Mutex;
 
 struct TaskItem {
@@ -49,13 +49,14 @@ impl Tool for TaskTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let action = args.get("action")
-            .and_then(|a| a.as_str())
-            .unwrap_or("");
+        let action = args.get("action").and_then(|a| a.as_str()).unwrap_or("");
 
         match action {
             "create" => {
-                let desc = args.get("description").and_then(|d| d.as_str()).unwrap_or("Task");
+                let desc = args
+                    .get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("Task");
                 if desc.is_empty() {
                     return ToolResult::err("Description is required for create");
                 }
@@ -84,7 +85,10 @@ impl Tool for TaskTool {
                         "in_progress" => "[-]",
                         _ => "[ ]",
                     };
-                    output.push_str(&format!("  {} #{} - {}\n", marker, task.id, task.description));
+                    output.push_str(&format!(
+                        "  {} #{} - {}\n",
+                        marker, task.id, task.description
+                    ));
                 }
                 ToolResult::ok(output)
             }
@@ -93,14 +97,20 @@ impl Tool for TaskTool {
                 let mut tasks = TASKS.lock().unwrap();
                 if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
                     task.status = "completed".to_string();
-                    ToolResult::ok(format!("Task #{} marked as complete: {}", id, task.description))
+                    ToolResult::ok(format!(
+                        "Task #{} marked as complete: {}",
+                        id, task.description
+                    ))
                 } else {
                     ToolResult::err(format!("Task #{} not found", id))
                 }
             }
             "update" => {
                 let id = args.get("id").and_then(|i| i.as_u64()).unwrap_or(0) as usize;
-                let desc = args.get("description").and_then(|d| d.as_str()).unwrap_or("");
+                let desc = args
+                    .get("description")
+                    .and_then(|d| d.as_str())
+                    .unwrap_or("");
                 if desc.is_empty() {
                     return ToolResult::err("Description is required for update");
                 }
@@ -112,7 +122,10 @@ impl Tool for TaskTool {
                     ToolResult::err(format!("Task #{} not found", id))
                 }
             }
-            _ => ToolResult::err(format!("Unknown action: '{}'. Valid actions: create, list, complete, update", action)),
+            _ => ToolResult::err(format!(
+                "Unknown action: '{}'. Valid actions: create, list, complete, update",
+                action
+            )),
         }
     }
 }

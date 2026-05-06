@@ -26,8 +26,8 @@ impl Default for CompactionConfig {
         Self {
             enabled: true,
             token_threshold: 500_000, // 500K tokens
-            floor_tokens: 100_000,     // 100K floor
-            keep_recent: 10,           // keep 10 most recent messages
+            floor_tokens: 100_000,    // 100K floor
+            keep_recent: 10,          // keep 10 most recent messages
             model: "default".to_string(),
         }
     }
@@ -55,7 +55,10 @@ impl CompactionResult {
 
 /// Estimate total tokens in a set of messages
 pub fn estimate_message_tokens(messages: &[Message]) -> usize {
-    messages.iter().map(|m| estimate_tokens_for_message(m)).sum()
+    messages
+        .iter()
+        .map(|m| estimate_tokens_for_message(m))
+        .sum()
 }
 
 /// Estimate tokens for a single message
@@ -206,8 +209,14 @@ mod tests {
     fn create_test_messages(count: usize) -> Vec<Message> {
         let mut msgs = Vec::new();
         for i in 0..count {
-            msgs.push(Message::user(format!("This is test message number {} with some content for token estimation purposes", i)));
-            msgs.push(Message::assistant(format!("Response to message {} that provides helpful information", i)));
+            msgs.push(Message::user(format!(
+                "This is test message number {} with some content for token estimation purposes",
+                i
+            )));
+            msgs.push(Message::assistant(format!(
+                "Response to message {} that provides helpful information",
+                i
+            )));
         }
         msgs
     }

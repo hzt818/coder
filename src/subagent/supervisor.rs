@@ -1,6 +1,6 @@
 //! Supervisor - manages subagent lifecycle and collects results
 
-use super::spawn::{SpawnConfig, SubagentHandle, spawn_subagent};
+use super::spawn::{spawn_subagent, SpawnConfig, SubagentHandle};
 use crate::ai::{Message, Provider};
 use crate::tool::ToolRegistry;
 use std::sync::Arc;
@@ -93,12 +93,7 @@ impl Supervisor {
         messages: Vec<Message>,
     ) -> String {
         // Generate the subagent
-        let handle = spawn_subagent(
-            provider,
-            tools,
-            messages,
-            self.config.spawn_config.clone(),
-        );
+        let handle = spawn_subagent(provider, tools, messages, self.config.spawn_config.clone());
         let id = handle.id.clone();
         self.handles.push((id.clone(), handle));
         id

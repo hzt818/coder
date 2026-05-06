@@ -68,10 +68,7 @@ pub fn try_recover(workspace: &str) -> anyhow::Result<Option<Session>> {
     let data: serde_json::Value = serde_json::from_str(&content)?;
 
     // Verify workspace match
-    let saved_workspace = data
-        .get("workspace")
-        .and_then(|w| w.as_str())
-        .unwrap_or("");
+    let saved_workspace = data.get("workspace").and_then(|w| w.as_str()).unwrap_or("");
 
     if saved_workspace.is_empty() {
         // No workspace info - still offer recovery
@@ -195,9 +192,15 @@ pub fn format_checkpoint_info() -> String {
     let offline_count = offline_queue_length();
 
     let mut info = "── Checkpoint Status ──\n".to_string();
-    info.push_str(&format!("Checkpoint exists: {}\n", if ckpt_exists { "Yes" } else { "No" }));
+    info.push_str(&format!(
+        "Checkpoint exists: {}\n",
+        if ckpt_exists { "Yes" } else { "No" }
+    ));
     info.push_str(&format!("Offline queue: {} messages\n", offline_count));
-    info.push_str(&format!("Checkpoint path: {}\n", latest_checkpoint_path().display()));
+    info.push_str(&format!(
+        "Checkpoint path: {}\n",
+        latest_checkpoint_path().display()
+    ));
 
     if ckpt_exists {
         // Read info from checkpoint
@@ -244,8 +247,10 @@ mod tests {
         let workspace = tmp.path().to_str().unwrap().to_string();
 
         // Save checkpoint
-        assert!(save_checkpoint(&session, &workspace).is_ok()
-            || save_checkpoint(&session, &workspace).is_err());
+        assert!(
+            save_checkpoint(&session, &workspace).is_ok()
+                || save_checkpoint(&session, &workspace).is_err()
+        );
 
         // Clean up
         let _ = clear_checkpoint();
@@ -254,8 +259,9 @@ mod tests {
     #[test]
     fn test_offline_queue_roundtrip() {
         // Queue a message
-        assert!(queue_offline("test message 1").is_ok()
-            || queue_offline("test message 1").is_err());
+        assert!(
+            queue_offline("test message 1").is_ok() || queue_offline("test message 1").is_err()
+        );
 
         // Drain queue
         if let Ok(msgs) = drain_offline_queue() {

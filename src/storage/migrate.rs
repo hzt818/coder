@@ -36,7 +36,9 @@ async fn create_migrations_table(conn: &libsql::Connection) -> anyhow::Result<()
 }
 
 /// Get the set of already-applied migration IDs.
-async fn get_applied_migrations(conn: &libsql::Connection) -> anyhow::Result<std::collections::HashSet<String>> {
+async fn get_applied_migrations(
+    conn: &libsql::Connection,
+) -> anyhow::Result<std::collections::HashSet<String>> {
     let mut rows = conn
         .query("SELECT id FROM _migrations ORDER BY id", libsql::params![])
         .await?;

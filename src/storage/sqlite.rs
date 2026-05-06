@@ -17,9 +17,7 @@ impl SqliteDb {
             .to_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid database path: {}", path.display()))?;
 
-        let db = libsql::Builder::new_local(path_str)
-            .build()
-            .await?;
+        let db = libsql::Builder::new_local(path_str).build().await?;
         let conn = db.connect()?;
         let instance = Self { conn };
         instance.run_migrations().await?;

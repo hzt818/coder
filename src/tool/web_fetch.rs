@@ -1,8 +1,8 @@
 //! Web fetch tool - fetches web page content
 
+use super::*;
 use async_trait::async_trait;
 use std::net::{IpAddr, Ipv6Addr};
-use super::*;
 
 pub struct WebFetchTool;
 
@@ -30,9 +30,7 @@ impl Tool for WebFetchTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let url = args.get("url")
-            .and_then(|u| u.as_str())
-            .unwrap_or("");
+        let url = args.get("url").and_then(|u| u.as_str()).unwrap_or("");
 
         if url.is_empty() {
             return ToolResult::err("URL is required");
@@ -69,7 +67,8 @@ async fn fetch_url(url: &str) -> Result<String, String> {
         .build()
         .map_err(|e| format!("HTTP client error: {}", e))?;
 
-    let response = client.get(url)
+    let response = client
+        .get(url)
         .send()
         .await
         .map_err(|e| format!("Request failed: {}", e))?;
@@ -118,8 +117,16 @@ async fn check_ssrf(parsed: &url::Url) -> Result<(), String> {
 
     // Block obvious private hostnames
     let lower = host.to_lowercase();
-    if lower == "localhost" || lower == "127.0.0.1" || lower == "::1" || lower.ends_with(".local") || lower.ends_with(".internal") {
-        return Err(format!("SSRF blocked: '{}' is a private/internal hostname", host));
+    if lower == "localhost"
+        || lower == "127.0.0.1"
+        || lower == "::1"
+        || lower.ends_with(".local")
+        || lower.ends_with(".internal")
+    {
+        return Err(format!(
+            "SSRF blocked: '{}' is a private/internal hostname",
+            host
+        ));
     }
 
     // Resolve hostname and check IP ranges
@@ -127,7 +134,9 @@ async fn check_ssrf(parsed: &url::Url) -> Result<(), String> {
         for addr in addrs {
             if is_private_ip(addr.ip()) {
                 return Err(format!(
-                    "SSRF blocked: '{}' resolves to private IP {}", host, addr.ip()
+                    "SSRF blocked: '{}' resolves to private IP {}",
+                    host,
+                    addr.ip()
                 ));
             }
         }

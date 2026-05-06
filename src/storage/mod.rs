@@ -4,8 +4,8 @@
 //! session persistence, memory storage, configuration, and telemetry.
 
 pub mod db;
-pub mod sqlite;
 pub mod migrate;
+pub mod sqlite;
 
-pub use db::{Database, Memory, Event};
+pub use db::{Database, Event, Memory};
 pub use sqlite::SqliteDb;

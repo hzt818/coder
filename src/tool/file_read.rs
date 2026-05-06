@@ -1,7 +1,7 @@
 //! File read tool
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct FileReadTool;
 
@@ -39,9 +39,7 @@ impl Tool for FileReadTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let path = args.get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
 
         if path.is_empty() {
             return ToolResult::err("Path is required");
@@ -68,10 +66,21 @@ impl Tool for FileReadTool {
         let end = std::cmp::min(offset + limit, total_lines);
         let selected = lines[offset..end].join("\n");
 
-        let mut result = format!("File: {}\nLines {}-{} of {}\n\n{}", path, offset + 1, end, total_lines, selected);
+        let mut result = format!(
+            "File: {}\nLines {}-{} of {}\n\n{}",
+            path,
+            offset + 1,
+            end,
+            total_lines,
+            selected
+        );
 
         if end < total_lines {
-            result.push_str(&format!("\n\n... ({} more lines. Use offset={} to continue)", total_lines - end, end));
+            result.push_str(&format!(
+                "\n\n... ({} more lines. Use offset={} to continue)",
+                total_lines - end,
+                end
+            ));
         }
 
         ToolResult::ok(result)
@@ -92,7 +101,9 @@ mod tests {
     #[tokio::test]
     async fn test_file_read_not_found() {
         let tool = FileReadTool;
-        let result = tool.execute(serde_json::json!({"path": "/nonexistent/file.txt"})).await;
+        let result = tool
+            .execute(serde_json::json!({"path": "/nonexistent/file.txt"}))
+            .await;
         assert!(!result.success);
     }
 

@@ -1,7 +1,7 @@
 //! File edit tool - precise string replacement
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct FileEditTool;
 
@@ -37,19 +37,19 @@ impl Tool for FileEditTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let path = args.get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
 
         if path.is_empty() {
             return ToolResult::err("Path is required");
         }
 
-        let old_string = args.get("old_string")
+        let old_string = args
+            .get("old_string")
             .and_then(|o| o.as_str())
             .unwrap_or("");
 
-        let new_string = args.get("new_string")
+        let new_string = args
+            .get("new_string")
             .and_then(|n| n.as_str())
             .unwrap_or("");
 
@@ -97,11 +97,13 @@ mod tests {
         std::fs::write(&file_path, "Hello, world!").unwrap();
         let path_str = file_path.to_str().unwrap();
 
-        let result = tool.execute(serde_json::json!({
-            "path": path_str,
-            "old_string": "world",
-            "new_string": "Rust"
-        })).await;
+        let result = tool
+            .execute(serde_json::json!({
+                "path": path_str,
+                "old_string": "world",
+                "new_string": "Rust"
+            }))
+            .await;
         assert!(result.success);
 
         let content = std::fs::read_to_string(path_str).unwrap();
@@ -111,11 +113,13 @@ mod tests {
     #[tokio::test]
     async fn test_file_edit_not_found() {
         let tool = FileEditTool;
-        let result = tool.execute(serde_json::json!({
-            "path": "nonexistent.txt",
-            "old_string": "hello",
-            "new_string": "world"
-        })).await;
+        let result = tool
+            .execute(serde_json::json!({
+                "path": "nonexistent.txt",
+                "old_string": "hello",
+                "new_string": "world"
+            }))
+            .await;
         assert!(!result.success);
     }
 }

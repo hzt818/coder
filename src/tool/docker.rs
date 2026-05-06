@@ -3,9 +3,9 @@
 //! Supports ps, logs, exec, and compose operations.
 //! Uses shell commands (docker CLI) instead of bollard API.
 
+use super::*;
 use async_trait::async_trait;
 use tokio::process::Command;
-use super::*;
 
 pub struct DockerTool;
 
@@ -39,11 +39,10 @@ impl Tool for DockerTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let operation = args.get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let operation = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
-        let extra_args = args.get("args")
+        let extra_args = args
+            .get("args")
             .and_then(|a| a.as_object())
             .cloned()
             .unwrap_or_default();
@@ -57,7 +56,10 @@ impl Tool for DockerTool {
             "logs" => docker_logs(&extra_args).await,
             "exec" => docker_exec(&extra_args).await,
             "compose" => docker_compose(&extra_args).await,
-            _ => ToolResult::err(format!("Unknown docker operation: '{}'. Use: ps, logs, exec, compose", operation)),
+            _ => ToolResult::err(format!(
+                "Unknown docker operation: '{}'. Use: ps, logs, exec, compose",
+                operation
+            )),
         }
     }
 
@@ -91,7 +93,10 @@ async fn docker_ps(args: &serde_json::Map<String, serde_json::Value>) -> ToolRes
     if all {
         cmd_args.push("--all");
     }
-    cmd_args.extend_from_slice(&["--format", "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}"]);
+    cmd_args.extend_from_slice(&[
+        "--format",
+        "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}",
+    ]);
 
     match run_docker_cmd(&cmd_args).await {
         Ok(output) => ToolResult::ok(output),
@@ -101,37 +106,32 @@ async fn docker_ps(args: &serde_json::Map<String, serde_json::Value>) -> ToolRes
 
 /// Get container logs
 async fn docker_logs(args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let container = args.get("container")
-        .and_then(|c| c.as_str())
-        .unwrap_or("");
+    let container = args.get("container").and_then(|c| c.as_str()).unwrap_or("");
 
     if container.is_empty() {
         return ToolResult::err("Container name or ID is required");
     }
 
-    let tail = args.get("tail")
-        .and_then(|t| t.as_u64())
-        .unwrap_or(50);
+    let tail = args.get("tail").and_then(|t| t.as_u64()).unwrap_or(50);
 
     match run_docker_cmd(&["logs", "--tail", &tail.to_string(), container]).await {
-        Ok(output) => ToolResult::ok(format!("Logs for '{}' (last {} lines):\n\n{}", container, tail, output)),
+        Ok(output) => ToolResult::ok(format!(
+            "Logs for '{}' (last {} lines):\n\n{}",
+            container, tail, output
+        )),
         Err(e) => ToolResult::err(format!("Docker logs failed: {}", e)),
     }
 }
 
 /// Execute a command in a container
 async fn docker_exec(args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let container = args.get("container")
-        .and_then(|c| c.as_str())
-        .unwrap_or("");
+    let container = args.get("container").and_then(|c| c.as_str()).unwrap_or("");
 
     if container.is_empty() {
         return ToolResult::err("Container name or ID is required");
     }
 
-    let cmd = args.get("cmd")
-        .and_then(|c| c.as_str())
-        .unwrap_or("");
+    let cmd = args.get("cmd").and_then(|c| c.as_str()).unwrap_or("");
 
     if cmd.is_empty() {
         return ToolResult::err("Command to execute is required");
@@ -158,7 +158,9 @@ async fn docker_exec(args: &serde_json::Map<String, serde_json::Value>) -> ToolR
         result.push_str(&stdout);
     }
     if !stderr.is_empty() {
-        if !result.is_empty() { result.push('\n'); }
+        if !result.is_empty() {
+            result.push('\n');
+        }
         result.push_str(&format!("STDERR:\n{}", stderr));
     }
 
@@ -167,11 +169,13 @@ async fn docker_exec(args: &serde_json::Map<String, serde_json::Value>) -> ToolR
 
 /// Docker compose operations (via docker CLI)
 async fn docker_compose(args: &serde_json::Map<String, serde_json::Value>) -> ToolResult {
-    let subcommand = args.get("subcommand")
+    let subcommand = args
+        .get("subcommand")
         .and_then(|s| s.as_str())
         .unwrap_or("up");
 
-    let project_dir = args.get("project_dir")
+    let project_dir = args
+        .get("project_dir")
         .and_then(|p| p.as_str())
         .unwrap_or(".")
         .to_string();
@@ -184,14 +188,30 @@ async fn docker_compose(args: &serde_json::Map<String, serde_json::Value>) -> To
     }
 
     match subcommand {
-        "up" => { cmd.arg("up").arg("-d"); }
-        "down" => { cmd.arg("down"); }
-        "ps" => { cmd.arg("ps"); }
-        "logs" => { cmd.arg("logs"); }
-        "pull" => { cmd.arg("pull"); }
-        "build" => { cmd.arg("build"); }
-        "restart" => { cmd.arg("restart"); }
-        other => { cmd.arg(other); }
+        "up" => {
+            cmd.arg("up").arg("-d");
+        }
+        "down" => {
+            cmd.arg("down");
+        }
+        "ps" => {
+            cmd.arg("ps");
+        }
+        "logs" => {
+            cmd.arg("logs");
+        }
+        "pull" => {
+            cmd.arg("pull");
+        }
+        "build" => {
+            cmd.arg("build");
+        }
+        "restart" => {
+            cmd.arg("restart");
+        }
+        other => {
+            cmd.arg(other);
+        }
     }
 
     let output = match cmd.output().await {
@@ -237,7 +257,9 @@ mod tests {
     #[tokio::test]
     async fn test_docker_invalid_operation() {
         let tool = DockerTool;
-        let result = tool.execute(serde_json::json!({"operation": "invalid"})).await;
+        let result = tool
+            .execute(serde_json::json!({"operation": "invalid"}))
+            .await;
         assert!(!result.success);
     }
 }

@@ -4,9 +4,9 @@
 //! the side-git snapshot system. Allows rolling back workspace
 //! changes without affecting the project's own `.git`.
 
-use async_trait::async_trait;
 use super::*;
 use crate::core::snapshot::SnapshotManager;
+use async_trait::async_trait;
 use std::path::Path;
 
 pub struct SnapshotTool;
@@ -51,10 +51,7 @@ impl Tool for SnapshotTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let action = args
-            .get("action")
-            .and_then(|a| a.as_str())
-            .unwrap_or("");
+        let action = args.get("action").and_then(|a| a.as_str()).unwrap_or("");
 
         let workspace = args
             .get("workspace")
@@ -65,15 +62,13 @@ impl Tool for SnapshotTool {
         let manager = SnapshotManager::new(ws_path);
 
         match action {
-            "list" => {
-                match manager.list_snapshots() {
-                    Ok(snapshots) => {
-                        let output = crate::core::snapshot::format_snapshot_list(&snapshots);
-                        ToolResult::ok(output)
-                    }
-                    Err(e) => ToolResult::err(format!("Failed to list snapshots: {}", e)),
+            "list" => match manager.list_snapshots() {
+                Ok(snapshots) => {
+                    let output = crate::core::snapshot::format_snapshot_list(&snapshots);
+                    ToolResult::ok(output)
                 }
-            }
+                Err(e) => ToolResult::err(format!("Failed to list snapshots: {}", e)),
+            },
             "restore" => {
                 let snapshot_id = args
                     .get("snapshot_id")

@@ -7,10 +7,10 @@
 //! ────────────────────────────────────────     ← separator
 //!  @tag1 @tag2 · shortcut · status             ← hint/status line
 
+use super::app::App;
+use super::theme::AppTheme;
 use ratatui::prelude::*;
 use ratatui::widgets::{Paragraph, Wrap};
-use super::theme::AppTheme;
-use super::app::App;
 
 /// Prepare input text for display, replacing newlines with visual indicators.
 /// Returns (display_text, display_cursor_position)
@@ -27,13 +27,7 @@ fn prepare_input_display(input: &str, cursor_pos: usize) -> (String, usize) {
 }
 
 /// Render the bottom command bar (4 lines)
-pub fn render_input(
-    frame: &mut Frame,
-    area: Rect,
-    app: &App,
-    mode_hint: &str,
-    theme: &AppTheme,
-) {
+pub fn render_input(frame: &mut Frame, area: Rect, app: &App, mode_hint: &str, theme: &AppTheme) {
     if area.height < 4 {
         return;
     }
@@ -87,16 +81,24 @@ pub fn render_input(
         ));
     } else {
         let before = &display_input[..display_cursor];
-        spans.push(Span::styled(before.to_string(), Style::default().fg(theme.fg)));
+        spans.push(Span::styled(
+            before.to_string(),
+            Style::default().fg(theme.fg),
+        ));
 
         if let Some(c) = display_input[display_cursor..].chars().next() {
             spans.push(Span::styled(
                 c.to_string(),
-                Style::default().fg(theme.selection_fg).bg(theme.selection_bg),
+                Style::default()
+                    .fg(theme.selection_fg)
+                    .bg(theme.selection_bg),
             ));
             let c_len = c.len_utf8();
             let after = &display_input[display_cursor + c_len..];
-            spans.push(Span::styled(after.to_string(), Style::default().fg(theme.fg)));
+            spans.push(Span::styled(
+                after.to_string(),
+                Style::default().fg(theme.fg),
+            ));
         } else {
             spans.push(Span::styled(
                 "█",
@@ -107,8 +109,7 @@ pub fn render_input(
         }
     }
 
-    let input_para = Paragraph::new(Line::from(spans))
-        .wrap(Wrap { trim: false });
+    let input_para = Paragraph::new(Line::from(spans)).wrap(Wrap { trim: false });
     frame.render_widget(input_para, input_line);
 
     // ── Line 3: Plain separator ──
@@ -155,28 +156,16 @@ fn build_hint_line<'a>(app: &App, mode_text: &'a str, theme: &AppTheme, width: u
         super::app::AppMode::Input => {
             if app.input.is_empty() {
                 // Show tag-style hints only when input is empty
-                spans.push(Span::styled(
-                    "@mention",
-                    Style::default().fg(theme.user),
-                ));
+                spans.push(Span::styled("@mention", Style::default().fg(theme.user)));
                 spans.push(Span::styled("  ", Style::default()));
 
-                spans.push(Span::styled(
-                    "!shell",
-                    Style::default().fg(theme.tool),
-                ));
+                spans.push(Span::styled("!shell", Style::default().fg(theme.tool)));
                 spans.push(Span::styled("  ", Style::default()));
 
-                spans.push(Span::styled(
-                    "?help",
-                    Style::default().fg(theme.accent),
-                ));
+                spans.push(Span::styled("?help", Style::default().fg(theme.accent)));
                 spans.push(Span::styled("  ", Style::default()));
 
-                spans.push(Span::styled(
-                    "/cmd",
-                    Style::default().fg(theme.warning),
-                ));
+                spans.push(Span::styled("/cmd", Style::default().fg(theme.warning)));
                 spans.push(Span::styled("  ·  ", Style::default().fg(theme.dim)));
                 spans.push(Span::styled(
                     "ctrl+o detail",
@@ -190,17 +179,16 @@ fn build_hint_line<'a>(app: &App, mode_text: &'a str, theme: &AppTheme, width: u
         super::app::AppMode::Streaming => {
             spans.push(Span::styled(
                 "◉ ",
-                Style::default().fg(theme.success).add_modifier(Modifier::SLOW_BLINK),
+                Style::default()
+                    .fg(theme.success)
+                    .add_modifier(Modifier::SLOW_BLINK),
             ));
             spans.push(Span::styled(
                 "AI responding",
                 Style::default().fg(theme.success),
             ));
             spans.push(Span::styled(" · ", Style::default().fg(theme.dim)));
-            spans.push(Span::styled(
-                mode_text,
-                Style::default().fg(theme.dim),
-            ));
+            spans.push(Span::styled(mode_text, Style::default().fg(theme.dim)));
         }
         _ => {
             spans.push(Span::styled(mode_text, Style::default().fg(theme.dim)));

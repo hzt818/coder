@@ -4,8 +4,8 @@
 //! cancelling persistent background shell processes. Ported from
 //! DeepSeek-TUI's BackgroundShell pattern.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::io::{BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -15,7 +15,13 @@ use tokio::sync::RwLock;
 
 /// Status of a shell process.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ShellStatus { Running, Completed, Failed, Killed, TimedOut }
+pub enum ShellStatus {
+    Running,
+    Completed,
+    Failed,
+    Killed,
+    TimedOut,
+}
 
 /// A tracked background shell job.
 #[derive(Debug)]
@@ -34,7 +40,11 @@ impl BackgroundJob {
             match child.try_wait() {
                 Ok(Some(status)) => {
                     self.exit_code = status.code();
-                    self.status = if status.success() { ShellStatus::Completed } else { ShellStatus::Failed };
+                    self.status = if status.success() {
+                        ShellStatus::Completed
+                    } else {
+                        ShellStatus::Failed
+                    };
                     // Read remaining output
                     // ... (handled by reader threads)
                 }
@@ -53,28 +63,48 @@ pub struct BackgroundShellManager {
 
 impl BackgroundShellManager {
     pub fn new() -> Self {
-        Self { jobs: RwLock::new(HashMap::new()), next_id: std::sync::atomic::AtomicU64::new(1) }
+        Self {
+            jobs: RwLock::new(HashMap::new()),
+            next_id: std::sync::atomic::AtomicU64::new(1),
+        }
     }
 
     /// Generate a unique job ID.
     fn generate_id(&self) -> String {
-        format!("job-{}", self.next_id.fetch_add(1, std::sync::atomic::Ordering::SeqCst))
+        format!(
+            "job-{}",
+            self.next_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+        )
     }
 
     /// Start a background shell command.
     pub async fn start(&self, command: &str, cwd: Option<&str>) -> Result<String, String> {
         let id = self.generate_id();
 
-        let mut child = Command::new(if cfg!(target_os = "windows") { "cmd" } else { "sh" });
-        child.arg(if cfg!(target_os = "windows") { "/C" } else { "-c" });
-        child.arg(command)
+        let mut child = Command::new(if cfg!(target_os = "windows") {
+            "cmd"
+        } else {
+            "sh"
+        });
+        child.arg(if cfg!(target_os = "windows") {
+            "/C"
+        } else {
+            "-c"
+        });
+        child
+            .arg(command)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
 
-        if let Some(dir) = cwd { child.current_dir(dir); }
+        if let Some(dir) = cwd {
+            child.current_dir(dir);
+        }
 
-        let mut child = child.spawn().map_err(|e| format!("Failed to spawn: {}", e))?;
+        let mut child = child
+            .spawn()
+            .map_err(|e| format!("Failed to spawn: {}", e))?;
 
         let stdin = child.stdin.take().ok_or_else(|| "No stdin".to_string())?;
         let stdout = child.stdout.take().ok_or_else(|| "No stdout".to_string())?;
@@ -147,15 +177,22 @@ impl BackgroundShellManager {
                 if let Some(job) = jobs.get_mut(id) {
                     job.try_update_status();
                     if job.status != ShellStatus::Running {
-                        return Ok(format!("Job {} finished: {:?}\nstdout: {} bytes\nstderr: {} bytes",
-                            id, job.status, job.stdout_buf.lock().unwrap().len(), job.stderr_buf.lock().unwrap().len()));
+                        return Ok(format!(
+                            "Job {} finished: {:?}\nstdout: {} bytes\nstderr: {} bytes",
+                            id,
+                            job.status,
+                            job.stdout_buf.lock().unwrap().len(),
+                            job.stderr_buf.lock().unwrap().len()
+                        ));
                     }
                 } else {
                     return Err(format!("Job not found: {}", id));
                 }
             }
             if let Some(dead) = deadline {
-                if Instant::now() >= dead { return Err("Timeout".to_string()); }
+                if Instant::now() >= dead {
+                    return Err("Timeout".to_string());
+                }
             }
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
@@ -164,12 +201,16 @@ impl BackgroundShellManager {
     /// Send input to a running job's stdin.
     pub async fn send_input(&self, id: &str, input: &str) -> Result<(), String> {
         let mut jobs = self.jobs.write().await;
-        let job = jobs.get_mut(id).ok_or_else(|| format!("Job not found: {}", id))?;
+        let job = jobs
+            .get_mut(id)
+            .ok_or_else(|| format!("Job not found: {}", id))?;
         if job.status != ShellStatus::Running {
             return Err("Job is not running".to_string());
         }
         if let Some(ref mut stdin) = job.stdin {
-            stdin.write_all(input.as_bytes()).map_err(|e| format!("Write error: {}", e))?;
+            stdin
+                .write_all(input.as_bytes())
+                .map_err(|e| format!("Write error: {}", e))?;
             stdin.flush().map_err(|e| format!("Flush error: {}", e))?;
         }
         Ok(())
@@ -203,8 +244,12 @@ pub struct TaskShellStart;
 
 #[async_trait]
 impl Tool for TaskShellStart {
-    fn name(&self) -> &str { "task_shell_start" }
-    fn description(&self) -> &str { "Start a command in the background and return a job ID" }
+    fn name(&self) -> &str {
+        "task_shell_start"
+    }
+    fn description(&self) -> &str {
+        "Start a command in the background and return a job ID"
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {
@@ -215,22 +260,33 @@ impl Tool for TaskShellStart {
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let cmd = args.get("command").and_then(|c| c.as_str()).unwrap_or("");
-        if cmd.is_empty() { return ToolResult::err("Command is required"); }
+        if cmd.is_empty() {
+            return ToolResult::err("Command is required");
+        }
         let cwd = args.get("cwd").and_then(|c| c.as_str());
         match bg_manager().start(cmd, cwd).await {
-            Ok(id) => ToolResult::ok(format!("Started background job: {}\nCommand: {}\nUse task_shell_wait to check on it.", id, cmd)),
+            Ok(id) => ToolResult::ok(format!(
+                "Started background job: {}\nCommand: {}\nUse task_shell_wait to check on it.",
+                id, cmd
+            )),
             Err(e) => ToolResult::err(e),
         }
     }
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 pub struct TaskShellWait;
 
 #[async_trait]
 impl Tool for TaskShellWait {
-    fn name(&self) -> &str { "task_shell_wait" }
-    fn description(&self) -> &str { "Wait for a background job to complete and get its output" }
+    fn name(&self) -> &str {
+        "task_shell_wait"
+    }
+    fn description(&self) -> &str {
+        "Wait for a background job to complete and get its output"
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {
@@ -241,22 +297,30 @@ impl Tool for TaskShellWait {
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let id = args.get("job_id").and_then(|j| j.as_str()).unwrap_or("");
-        if id.is_empty() { return ToolResult::err("job_id is required"); }
+        if id.is_empty() {
+            return ToolResult::err("job_id is required");
+        }
         let timeout = args.get("timeout").and_then(|t| t.as_i64()).unwrap_or(30);
         match bg_manager().wait(id, Some(timeout as u64)).await {
             Ok(output) => ToolResult::ok(output),
             Err(e) => ToolResult::err(e),
         }
     }
-    fn requires_permission(&self) -> bool { false }
+    fn requires_permission(&self) -> bool {
+        false
+    }
 }
 
 pub struct TaskShellInteract;
 
 #[async_trait]
 impl Tool for TaskShellInteract {
-    fn name(&self) -> &str { "task_shell_interact" }
-    fn description(&self) -> &str { "Send input to a running background job's stdin" }
+    fn name(&self) -> &str {
+        "task_shell_interact"
+    }
+    fn description(&self) -> &str {
+        "Send input to a running background job's stdin"
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {
@@ -268,21 +332,29 @@ impl Tool for TaskShellInteract {
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let id = args.get("job_id").and_then(|j| j.as_str()).unwrap_or("");
         let input = args.get("input").and_then(|i| i.as_str()).unwrap_or("");
-        if id.is_empty() { return ToolResult::err("job_id is required"); }
+        if id.is_empty() {
+            return ToolResult::err("job_id is required");
+        }
         match bg_manager().send_input(id, input).await {
             Ok(()) => ToolResult::ok("Input sent"),
             Err(e) => ToolResult::err(e),
         }
     }
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 pub struct TaskShellCancel;
 
 #[async_trait]
 impl Tool for TaskShellCancel {
-    fn name(&self) -> &str { "task_shell_cancel" }
-    fn description(&self) -> &str { "Cancel a background job" }
+    fn name(&self) -> &str {
+        "task_shell_cancel"
+    }
+    fn description(&self) -> &str {
+        "Cancel a background job"
+    }
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object", "properties": {
@@ -292,13 +364,17 @@ impl Tool for TaskShellCancel {
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let id = args.get("job_id").and_then(|j| j.as_str()).unwrap_or("");
-        if id.is_empty() { return ToolResult::err("job_id is required"); }
+        if id.is_empty() {
+            return ToolResult::err("job_id is required");
+        }
         match bg_manager().cancel(id).await {
             Ok(()) => ToolResult::ok(format!("Job {} cancelled", id)),
             Err(e) => ToolResult::err(e),
         }
     }
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

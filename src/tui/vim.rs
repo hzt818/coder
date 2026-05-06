@@ -118,7 +118,10 @@ impl VimState {
     /// that should fall through to the default handler.
     pub fn handle_normal_key(&mut self, key: KeyEvent) -> Vec<Action> {
         // Pass Ctrl/Alt combinations through to the default handler.
-        if key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) {
+        if key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        {
             return Vec::new();
         }
 
@@ -147,7 +150,11 @@ impl VimState {
             KeyCode::Char('A') => vec![Action::MoveEnd, Action::EnterInsertMode],
             // o  → open line below (append newline at end, then insert)
             KeyCode::Char('o') => {
-                vec![Action::MoveEnd, Action::InsertChar('\n'), Action::EnterInsertMode]
+                vec![
+                    Action::MoveEnd,
+                    Action::InsertChar('\n'),
+                    Action::EnterInsertMode,
+                ]
             }
             // O  → open line above (insert newline at start, then insert)
             KeyCode::Char('O') => {
@@ -323,10 +330,7 @@ mod tests {
 
         // i → EnterInsertMode
         let ev = KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE);
-        assert_eq!(
-            state.handle_normal_key(ev),
-            vec![Action::EnterInsertMode],
-        );
+        assert_eq!(state.handle_normal_key(ev), vec![Action::EnterInsertMode],);
     }
 
     #[test]
@@ -473,10 +477,7 @@ mod tests {
         state.enter_normal_mode();
 
         let ev = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
-        assert_eq!(
-            state.handle_normal_key(ev),
-            vec![Action::EnterNormalMode],
-        );
+        assert_eq!(state.handle_normal_key(ev), vec![Action::EnterNormalMode],);
     }
 
     // ── Ctrl keys pass through ─────────────────────────────────

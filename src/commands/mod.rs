@@ -6,4 +6,4 @@
 
 pub mod user_commands;
 
-pub use user_commands::{UserCommand, UserCommandManager, format_user_commands};
+pub use user_commands::{format_user_commands, UserCommand, UserCommandManager};

@@ -56,10 +56,7 @@ pub async fn run_post_edit_lsp<'a>(
     let mut all_diagnostics = Vec::new();
 
     for file in edited_files {
-        let extension = file
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let extension = file.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         // Find the matching LSP client for this file type
         for client in lsp_clients {
@@ -105,9 +102,18 @@ pub fn format_diagnostics_for_context(diagnostics: &[DiagnosticResult]) -> Optio
     }
 
     // Group by severity
-    let errors: Vec<&DiagnosticResult> = diagnostics.iter().filter(|d| d.severity == DiagnosticSeverity::Error).collect();
-    let warnings: Vec<&DiagnosticResult> = diagnostics.iter().filter(|d| d.severity == DiagnosticSeverity::Warning).collect();
-    let infos: Vec<&DiagnosticResult> = diagnostics.iter().filter(|d| d.severity == DiagnosticSeverity::Information).collect();
+    let errors: Vec<&DiagnosticResult> = diagnostics
+        .iter()
+        .filter(|d| d.severity == DiagnosticSeverity::Error)
+        .collect();
+    let warnings: Vec<&DiagnosticResult> = diagnostics
+        .iter()
+        .filter(|d| d.severity == DiagnosticSeverity::Warning)
+        .collect();
+    let infos: Vec<&DiagnosticResult> = diagnostics
+        .iter()
+        .filter(|d| d.severity == DiagnosticSeverity::Information)
+        .collect();
 
     let mut result = String::new();
     result.push_str("── LSP Diagnostics ──\n");
@@ -222,16 +228,14 @@ mod tests {
 
     #[test]
     fn test_format_diagnostics_infos_only() {
-        let diagnostics = vec![
-            DiagnosticResult {
-                severity: DiagnosticSeverity::Information,
-                message: "consider using 'map' here".to_string(),
-                file: "src/lib.rs".to_string(),
-                line: 42,
-                column: 10,
-                source: "clippy".to_string(),
-            },
-        ];
+        let diagnostics = vec![DiagnosticResult {
+            severity: DiagnosticSeverity::Information,
+            message: "consider using 'map' here".to_string(),
+            file: "src/lib.rs".to_string(),
+            line: 42,
+            column: 10,
+            source: "clippy".to_string(),
+        }];
 
         let result = format_diagnostics_for_context(&diagnostics);
         assert!(result.is_some());

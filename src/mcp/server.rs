@@ -40,7 +40,9 @@ impl McpServer {
             // Read headers line by line
             loop {
                 line.clear();
-                let bytes_read = reader.read_line(&mut line).await
+                let bytes_read = reader
+                    .read_line(&mut line)
+                    .await
                     .map_err(|e| anyhow::anyhow!("Error reading stdin: {}", e))?;
                 if bytes_read == 0 {
                     self.running.store(false, Ordering::SeqCst);
@@ -61,7 +63,9 @@ impl McpServer {
             // Read the JSON body
             if let Some(len) = content_length {
                 let mut buf = vec![0u8; len];
-                reader.read_exact(&mut buf).await
+                reader
+                    .read_exact(&mut buf)
+                    .await
                     .map_err(|e| anyhow::anyhow!("Failed to read request body: {}", e))?;
 
                 if let Ok(request) = serde_json::from_slice::<serde_json::Value>(&buf) {
@@ -135,10 +139,20 @@ impl McpServer {
     }
 
     /// Handle tools/call request - execute a tool.
-    async fn handle_tools_call(&self, request: &serde_json::Value, id: Option<&serde_json::Value>) -> serde_json::Value {
+    async fn handle_tools_call(
+        &self,
+        request: &serde_json::Value,
+        id: Option<&serde_json::Value>,
+    ) -> serde_json::Value {
         let params = request.get("params");
-        let tool_name = params.and_then(|p| p.get("name")).and_then(|n| n.as_str()).unwrap_or("");
-        let arguments = params.and_then(|p| p.get("arguments")).cloned().unwrap_or(serde_json::Value::Null);
+        let tool_name = params
+            .and_then(|p| p.get("name"))
+            .and_then(|n| n.as_str())
+            .unwrap_or("");
+        let arguments = params
+            .and_then(|p| p.get("arguments"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
 
         if tool_name.is_empty() {
             return self.make_error(id, -32602, "Tool name is required".to_string());
@@ -147,16 +161,25 @@ impl McpServer {
         let result = self.registry.execute(tool_name, arguments).await;
 
         if result.success {
-            self.make_response(id, serde_json::json!({
-                "content": [
-                    {
-                        "type": "text",
-                        "text": result.output
-                    }
-                ]
-            }))
+            self.make_response(
+                id,
+                serde_json::json!({
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": result.output
+                        }
+                    ]
+                }),
+            )
         } else {
-            self.make_error(id, -32000, result.error.unwrap_or_else(|| "Tool execution failed".into()))
+            self.make_error(
+                id,
+                -32000,
+                result
+                    .error
+                    .unwrap_or_else(|| "Tool execution failed".into()),
+            )
         }
     }
 
@@ -166,7 +189,11 @@ impl McpServer {
     }
 
     /// Create a JSON-RPC success response.
-    fn make_response(&self, id: Option<&serde_json::Value>, result: serde_json::Value) -> serde_json::Value {
+    fn make_response(
+        &self,
+        id: Option<&serde_json::Value>,
+        result: serde_json::Value,
+    ) -> serde_json::Value {
         serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -175,7 +202,12 @@ impl McpServer {
     }
 
     /// Create a JSON-RPC error response.
-    fn make_error(&self, id: Option<&serde_json::Value>, code: i64, message: String) -> serde_json::Value {
+    fn make_error(
+        &self,
+        id: Option<&serde_json::Value>,
+        code: i64,
+        message: String,
+    ) -> serde_json::Value {
         serde_json::json!({
             "jsonrpc": "2.0",
             "id": id,
@@ -247,11 +279,13 @@ mod tests {
     #[tokio::test]
     async fn test_handle_unknown_method() {
         let server = create_server();
-        let response = server.handle_request(&serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 4,
-            "method": "unknown"
-        })).await;
+        let response = server
+            .handle_request(&serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "unknown"
+            }))
+            .await;
         assert!(response.get("error").is_some());
         assert_eq!(response["error"]["code"], -32601);
     }

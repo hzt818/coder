@@ -3,11 +3,11 @@
 //! Defines permission policies (allow, deny, ask) and an evaluator
 //! that checks whether a given action is permitted.
 
-pub mod policy;
 pub mod evaluator;
+pub mod policy;
 
-pub use policy::{Policy, PolicySet, PermissionLevel};
 pub use evaluator::PermissionEvaluator;
+pub use policy::{PermissionLevel, Policy, PolicySet};
 
 /// Result type for permission operations
 pub type PermissionResult<T> = std::result::Result<T, PermissionError>;

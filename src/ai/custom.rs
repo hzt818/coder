@@ -4,9 +4,9 @@
 //! implemented. Falls back to OpenAI-compatible HTTP call when no custom
 //! template is provided.
 
-use async_trait::async_trait;
-use super::*;
 use super::provider::{Provider, StreamHandler};
+use super::*;
+use async_trait::async_trait;
 
 /// Custom provider with user-defined templates.
 ///
@@ -79,13 +79,18 @@ impl Provider for CustomProvider {
                     if !resp.status().is_success() {
                         let status = resp.status();
                         let body = resp.text().await.unwrap_or_default();
-                        let _ = tx.send(StreamEvent::Error(
-                            format!("Custom provider HTTP error ({}): {}", status, body),
-                        )).await;
+                        let _ = tx
+                            .send(StreamEvent::Error(format!(
+                                "Custom provider HTTP error ({}): {}",
+                                status, body
+                            )))
+                            .await;
                         return Ok(rx);
                     }
                     tokio::spawn(async move {
-                        if let Err(e) = super::openai::parse_sse_stream_public(resp, tx.clone()).await {
+                        if let Err(e) =
+                            super::openai::parse_sse_stream_public(resp, tx.clone()).await
+                        {
                             tracing::error!("Custom provider SSE parse error: {}", e);
                             let _ = tx.send(StreamEvent::Error(e.to_string())).await;
                         }
@@ -93,9 +98,12 @@ impl Provider for CustomProvider {
                     Ok(rx)
                 }
                 Err(e) => {
-                    let _ = tx.send(StreamEvent::Error(
-                        format!("Custom provider request failed: {}", e),
-                    )).await;
+                    let _ = tx
+                        .send(StreamEvent::Error(format!(
+                            "Custom provider request failed: {}",
+                            e
+                        )))
+                        .await;
                     Ok(rx)
                 }
             }
@@ -107,9 +115,11 @@ impl Provider for CustomProvider {
                 self.request_template.as_deref(),
                 self.response_parser.as_deref()
             );
-            let _ = tx.send(StreamEvent::Error(
-                "Custom provider: request_template parsing not yet implemented".to_string(),
-            )).await;
+            let _ = tx
+                .send(StreamEvent::Error(
+                    "Custom provider: request_template parsing not yet implemented".to_string(),
+                ))
+                .await;
             Ok(rx)
         }
     }

@@ -246,7 +246,10 @@ mod tests {
     fn test_policy_with_reason() {
         let policy = Policy::new("deny-bash", "bash", PermissionLevel::Deny)
             .with_reason("Shell access is restricted");
-        assert_eq!(policy.reason, Some("Shell access is restricted".to_string()));
+        assert_eq!(
+            policy.reason,
+            Some("Shell access is restricted".to_string())
+        );
     }
 
     #[test]

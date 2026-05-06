@@ -41,17 +41,17 @@ impl Theme {
         Self {
             name: "coder-dark".to_string(),
             colors: ThemeColors {
-                primary: "#00FFAA".into(),       // Bright green
-                secondary: "#00AAFF".into(),      // Bright cyan
+                primary: "#00FFAA".into(),   // Bright green
+                secondary: "#00AAFF".into(), // Bright cyan
                 success: "#00FF00".into(),
                 error: "#FF3333".into(),
                 warning: "#FFAA00".into(),
                 info: "#8888FF".into(),
-                user_message: "#00DDFF".into(),   // Cyan for user
+                user_message: "#00DDFF".into(),      // Cyan for user
                 assistant_message: "#00FF88".into(), // Green for AI
-                tool_call: "#FFDD00".into(),      // Yellow for tools
-                code_block: "#FF66FF".into(),     // Magenta for code
-                selection: "#FFFFFF".into(),       // White
+                tool_call: "#FFDD00".into(),         // Yellow for tools
+                code_block: "#FF66FF".into(),        // Magenta for code
+                selection: "#FFFFFF".into(),         // White
                 background: "#1A1A2E".into(),
                 foreground: "#E0E0E0".into(),
                 dim_text: "#666666".into(),

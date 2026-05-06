@@ -6,14 +6,14 @@
 //! - Google (Gemini)
 //! - Custom (user-defined request/response templates)
 
-pub mod provider;
-pub mod types;
-pub mod openai;
 pub mod anthropic;
-pub mod google;
 pub mod custom;
+pub mod google;
+pub mod openai;
 #[cfg(feature = "ai-opencode")]
 pub mod opencode;
+pub mod provider;
+pub mod types;
 
 pub use provider::Provider;
 pub use types::*;

@@ -192,8 +192,12 @@ mod tests {
         for locale in &locales {
             for (id, _) in all_messages() {
                 let result = translate(*locale, id);
-                assert!(!result.is_empty(),
-                    "Locale {:?} returned empty string for {:?}", locale, id);
+                assert!(
+                    !result.is_empty(),
+                    "Locale {:?} returned empty string for {:?}",
+                    locale,
+                    id
+                );
             }
         }
     }
@@ -208,22 +212,40 @@ mod tests {
     #[test]
     fn test_japanese_translations() {
         assert_eq!(translate(Locale::Ja, MessageId::StatusReady), "準備完了");
-        assert_eq!(translate(Locale::Ja, MessageId::StatusThinking), "考え中...");
-        assert_eq!(translate(Locale::Ja, MessageId::ErrorGeneric), "エラーが発生しました");
+        assert_eq!(
+            translate(Locale::Ja, MessageId::StatusThinking),
+            "考え中..."
+        );
+        assert_eq!(
+            translate(Locale::Ja, MessageId::ErrorGeneric),
+            "エラーが発生しました"
+        );
     }
 
     #[test]
     fn test_chinese_translations() {
         assert_eq!(translate(Locale::ZhHans, MessageId::StatusReady), "就绪");
-        assert_eq!(translate(Locale::ZhHans, MessageId::StatusThinking), "思考中...");
-        assert_eq!(translate(Locale::ZhHans, MessageId::ErrorGeneric), "发生错误");
+        assert_eq!(
+            translate(Locale::ZhHans, MessageId::StatusThinking),
+            "思考中..."
+        );
+        assert_eq!(
+            translate(Locale::ZhHans, MessageId::ErrorGeneric),
+            "发生错误"
+        );
     }
 
     #[test]
     fn test_portuguese_translations() {
         assert_eq!(translate(Locale::PtBr, MessageId::StatusReady), "Pronto");
-        assert_eq!(translate(Locale::PtBr, MessageId::StatusThinking), "Pensando...");
-        assert_eq!(translate(Locale::PtBr, MessageId::ErrorGeneric), "Ocorreu um erro");
+        assert_eq!(
+            translate(Locale::PtBr, MessageId::StatusThinking),
+            "Pensando..."
+        );
+        assert_eq!(
+            translate(Locale::PtBr, MessageId::ErrorGeneric),
+            "Ocorreu um erro"
+        );
     }
 
     #[test]
@@ -246,9 +268,6 @@ mod tests {
             tr_with_locale(Locale::PtBr, MessageId::ToolSuccess),
             "Sucesso"
         );
-        assert_eq!(
-            tr_with_locale(Locale::Ja, MessageId::ToolSuccess),
-            "成功"
-        );
+        assert_eq!(tr_with_locale(Locale::Ja, MessageId::ToolSuccess), "成功");
     }
 }

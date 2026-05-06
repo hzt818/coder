@@ -1,8 +1,8 @@
 //! Question tool - interactive user questioning
 
+use super::*;
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicBool, Ordering};
-use super::*;
 
 /// Global flag to check if there's a pending question
 static PENDING_QUESTION: AtomicBool = AtomicBool::new(false);
@@ -49,17 +49,20 @@ impl Tool for QuestionTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let question = args.get("question")
-            .and_then(|q| q.as_str())
-            .unwrap_or("");
+        let question = args.get("question").and_then(|q| q.as_str()).unwrap_or("");
 
         if question.is_empty() {
             return ToolResult::err("Question is required");
         }
 
-        let options: Vec<String> = args.get("options")
+        let options: Vec<String> = args
+            .get("options")
             .and_then(|o| o.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         // Format the question for display

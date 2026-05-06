@@ -1,10 +1,10 @@
 //! Syntax highlighting for code blocks using syntect
 
 use ratatui::prelude::*;
+use std::sync::OnceLock;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
-use std::sync::OnceLock;
 
 use super::theme::AppTheme;
 
@@ -50,10 +50,7 @@ pub fn highlight_code_block(
             Ok(r) => r,
             Err(_) => {
                 // Fallback: render the raw line
-                lines.push(Line::from(Span::styled(
-                    line.to_string(),
-                    Style::default(),
-                )));
+                lines.push(Line::from(Span::styled(line.to_string(), Style::default())));
                 continue;
             }
         };

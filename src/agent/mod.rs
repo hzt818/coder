@@ -7,12 +7,12 @@
 //! 4. Handle tool calls
 //! 5. Repeat until complete
 
-pub mod r#loop;
-pub mod context;
-pub mod dispatch;
-pub mod types;
 pub mod auto_reasoning;
+pub mod context;
 pub mod coordinator;
+pub mod dispatch;
+pub mod r#loop;
+pub mod types;
 
 pub use r#loop::Agent;
 pub use types::AgentType;

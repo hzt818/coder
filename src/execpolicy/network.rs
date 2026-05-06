@@ -13,11 +13,11 @@
 //!   any subdomain (`api.example.com`) but **not** the apex `example.com`.
 //! * Deny always wins over allow.
 
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -32,7 +32,11 @@ pub enum Decision {
 
 impl Decision {
     pub fn as_str(self) -> &'static str {
-        match self { Self::Allow => "Allow", Self::Deny => "Deny", Self::Prompt => "Prompt" }
+        match self {
+            Self::Allow => "Allow",
+            Self::Deny => "Deny",
+            Self::Prompt => "Prompt",
+        }
     }
 
     pub fn parse(value: &str) -> Self {
@@ -55,13 +59,21 @@ pub enum DecisionToml {
 
 impl From<DecisionToml> for Decision {
     fn from(v: DecisionToml) -> Self {
-        match v { DecisionToml::Allow => Self::Allow, DecisionToml::Deny => Self::Deny, DecisionToml::Prompt => Self::Prompt }
+        match v {
+            DecisionToml::Allow => Self::Allow,
+            DecisionToml::Deny => Self::Deny,
+            DecisionToml::Prompt => Self::Prompt,
+        }
     }
 }
 
 impl From<Decision> for DecisionToml {
     fn from(v: Decision) -> Self {
-        match v { Decision::Allow => Self::Allow, Decision::Deny => Self::Deny, Decision::Prompt => Self::Prompt }
+        match v {
+            Decision::Allow => Self::Allow,
+            Decision::Deny => Self::Deny,
+            Decision::Prompt => Self::Prompt,
+        }
     }
 }
 
@@ -78,12 +90,21 @@ pub struct NetworkPolicy {
     pub audit: bool,
 }
 
-fn default_decision() -> DecisionToml { DecisionToml::Prompt }
-fn default_audit() -> bool { true }
+fn default_decision() -> DecisionToml {
+    DecisionToml::Prompt
+}
+fn default_audit() -> bool {
+    true
+}
 
 impl Default for NetworkPolicy {
     fn default() -> Self {
-        Self { default: DecisionToml::Prompt, allow: Vec::new(), deny: Vec::new(), audit: true }
+        Self {
+            default: DecisionToml::Prompt,
+            allow: Vec::new(),
+            deny: Vec::new(),
+            audit: true,
+        }
     }
 }
 
@@ -91,32 +112,48 @@ impl NetworkPolicy {
     /// Decide for a single outbound call to `host`. Deny-wins.
     pub fn decide(&self, host: &str) -> Decision {
         let normalized = normalize_host(host);
-        if normalized.is_empty() { return self.default.into(); }
-        if self.deny.iter().any(|e| host_matches(e, &normalized)) { return Decision::Deny; }
-        if self.allow.iter().any(|e| host_matches(e, &normalized)) { return Decision::Allow; }
+        if normalized.is_empty() {
+            return self.default.into();
+        }
+        if self.deny.iter().any(|e| host_matches(e, &normalized)) {
+            return Decision::Deny;
+        }
+        if self.allow.iter().any(|e| host_matches(e, &normalized)) {
+            return Decision::Allow;
+        }
         self.default.into()
     }
 
     pub fn add_allow(&mut self, host: &str) {
         let normalized = normalize_host(host);
-        if normalized.is_empty() { return; }
+        if normalized.is_empty() {
+            return;
+        }
         if !self.allow.iter().any(|e| normalize_host(e) == normalized) {
             self.allow.push(normalized);
         }
     }
 
-    pub fn audit_enabled(&self) -> bool { self.audit }
+    pub fn audit_enabled(&self) -> bool {
+        self.audit
+    }
 }
 
 fn normalize_host(host: &str) -> String {
     let trimmed = host.trim().trim_end_matches('.').to_ascii_lowercase();
-    if let Some(rest) = trimmed.strip_prefix("*.") { format!(".{rest}") } else { trimmed }
+    if let Some(rest) = trimmed.strip_prefix("*.") {
+        format!(".{rest}")
+    } else {
+        trimmed
+    }
 }
 
 fn host_matches(entry: &str, normalized_host: &str) -> bool {
     let entry_norm = normalize_host(entry);
     if let Some(suffix) = entry_norm.strip_prefix('.') {
-        if suffix.is_empty() { return false; }
+        if suffix.is_empty() {
+            return false;
+        }
         normalized_host.ends_with(&format!(".{suffix}"))
     } else {
         entry_norm == normalized_host
@@ -131,7 +168,9 @@ pub struct NetworkAuditor {
 }
 
 impl NetworkAuditor {
-    pub fn new(path: PathBuf, enabled: bool) -> Self { Self { path, enabled } }
+    pub fn new(path: PathBuf, enabled: bool) -> Self {
+        Self { path, enabled }
+    }
 
     pub fn default_path(enabled: bool) -> Option<Self> {
         let home = dirs::home_dir()?;
@@ -139,24 +178,41 @@ impl NetworkAuditor {
     }
 
     pub fn record(&self, host: &str, tool: &str, decision_label: &str) {
-        if !self.enabled { return; }
+        if !self.enabled {
+            return;
+        }
         if let Err(err) = self.try_record(host, tool, decision_label) {
             eprintln!("network audit write failed: {err}");
         }
     }
 
     fn try_record(&self, host: &str, tool: &str, decision_label: &str) -> std::io::Result<()> {
-        if let Some(parent) = self.path.parent() { fs::create_dir_all(parent)?; }
-        let mut file = OpenOptions::new().create(true).append(true).open(&self.path)?;
-        writeln!(file, "{} network {} {} {}", chrono::Utc::now().to_rfc3339(),
-                 sanitize_field(host), sanitize_field(tool), decision_label)
+        if let Some(parent) = self.path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)?;
+        writeln!(
+            file,
+            "{} network {} {} {}",
+            chrono::Utc::now().to_rfc3339(),
+            sanitize_field(host),
+            sanitize_field(tool),
+            decision_label
+        )
     }
 
-    pub fn path(&self) -> &Path { &self.path }
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
 }
 
 fn sanitize_field(s: &str) -> String {
-    s.chars().map(|c| if c.is_whitespace() { '_' } else { c }).collect()
+    s.chars()
+        .map(|c| if c.is_whitespace() { '_' } else { c })
+        .collect()
 }
 
 /// In-process session cache for "approve once" decisions.
@@ -172,20 +228,34 @@ struct NetworkSessionCacheInner {
 }
 
 impl NetworkSessionCache {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
     pub fn is_approved(&self, host: &str) -> bool {
-        self.inner.lock().map(|g| g.approved.contains(&normalize_host(host))).unwrap_or(false)
+        self.inner
+            .lock()
+            .map(|g| g.approved.contains(&normalize_host(host)))
+            .unwrap_or(false)
     }
     pub fn is_denied(&self, host: &str) -> bool {
-        self.inner.lock().map(|g| g.denied.contains(&normalize_host(host))).unwrap_or(false)
+        self.inner
+            .lock()
+            .map(|g| g.denied.contains(&normalize_host(host)))
+            .unwrap_or(false)
     }
     pub fn approve(&self, host: &str) {
         let n = normalize_host(host);
-        if let Ok(mut g) = self.inner.lock() { g.denied.remove(&n); g.approved.insert(n); }
+        if let Ok(mut g) = self.inner.lock() {
+            g.denied.remove(&n);
+            g.approved.insert(n);
+        }
     }
     pub fn deny(&self, host: &str) {
         let n = normalize_host(host);
-        if let Ok(mut g) = self.inner.lock() { g.approved.remove(&n); g.denied.insert(n); }
+        if let Ok(mut g) = self.inner.lock() {
+            g.approved.remove(&n);
+            g.denied.insert(n);
+        }
     }
 }
 
@@ -195,7 +265,9 @@ impl NetworkSessionCache {
 pub struct NetworkDenied(pub String);
 
 impl NetworkDenied {
-    pub fn host(&self) -> &str { &self.0 }
+    pub fn host(&self) -> &str {
+        &self.0
+    }
 }
 
 /// Bundles policy + session cache + auditor for one-stop network decision.
@@ -208,36 +280,71 @@ pub struct NetworkPolicyDecider {
 
 impl NetworkPolicyDecider {
     pub fn new(policy: NetworkPolicy, auditor: Option<NetworkAuditor>) -> Self {
-        Self { policy, cache: NetworkSessionCache::new(), auditor }
+        Self {
+            policy,
+            cache: NetworkSessionCache::new(),
+            auditor,
+        }
     }
 
     pub fn with_default_audit(policy: NetworkPolicy) -> Self {
-        let auditor = if policy.audit_enabled() { NetworkAuditor::default_path(true) } else { None };
+        let auditor = if policy.audit_enabled() {
+            NetworkAuditor::default_path(true)
+        } else {
+            None
+        };
         Self::new(policy, auditor)
     }
 
-    pub fn policy(&self) -> &NetworkPolicy { &self.policy }
-    pub fn cache(&self) -> &NetworkSessionCache { &self.cache }
+    pub fn policy(&self) -> &NetworkPolicy {
+        &self.policy
+    }
+    pub fn cache(&self) -> &NetworkSessionCache {
+        &self.cache
+    }
 
     pub fn evaluate(&self, host: &str, tool: &str) -> Decision {
         let normalized = normalize_host(host);
-        if normalized.is_empty() { return self.policy.default.into(); }
-        if self.cache.is_denied(&normalized) { self.audit_record(&normalized, tool, "Deny"); return Decision::Deny; }
-        if self.cache.is_approved(&normalized) { self.audit_record(&normalized, tool, "Allow"); return Decision::Allow; }
+        if normalized.is_empty() {
+            return self.policy.default.into();
+        }
+        if self.cache.is_denied(&normalized) {
+            self.audit_record(&normalized, tool, "Deny");
+            return Decision::Deny;
+        }
+        if self.cache.is_approved(&normalized) {
+            self.audit_record(&normalized, tool, "Allow");
+            return Decision::Allow;
+        }
         let d = self.policy.decide(&normalized);
-        match d { Decision::Allow => self.audit_record(&normalized, tool, "Allow"), Decision::Deny => self.audit_record(&normalized, tool, "Deny"), Decision::Prompt => {} }
+        match d {
+            Decision::Allow => self.audit_record(&normalized, tool, "Allow"),
+            Decision::Deny => self.audit_record(&normalized, tool, "Deny"),
+            Decision::Prompt => {}
+        }
         d
     }
 
-    pub fn approve_session(&self, host: &str, tool: &str) { self.cache.approve(host); self.audit_record(host, tool, "Prompt-Approved"); }
-    pub fn deny_session(&self, host: &str, tool: &str) { self.cache.deny(host); self.audit_record(host, tool, "Prompt-Denied"); }
+    pub fn approve_session(&self, host: &str, tool: &str) {
+        self.cache.approve(host);
+        self.audit_record(host, tool, "Prompt-Approved");
+    }
+    pub fn deny_session(&self, host: &str, tool: &str) {
+        self.cache.deny(host);
+        self.audit_record(host, tool, "Prompt-Denied");
+    }
 
     pub fn approve_persistent(&mut self, host: &str, tool: &str) -> &NetworkPolicy {
-        self.policy.add_allow(host); self.cache.approve(host); self.audit_record(host, tool, "Prompt-Approved"); &self.policy
+        self.policy.add_allow(host);
+        self.cache.approve(host);
+        self.audit_record(host, tool, "Prompt-Approved");
+        &self.policy
     }
 
     fn audit_record(&self, host: &str, tool: &str, label: &str) {
-        if let Some(a) = self.auditor.as_ref() { a.record(host, tool, label); }
+        if let Some(a) = self.auditor.as_ref() {
+            a.record(host, tool, label);
+        }
     }
 }
 
@@ -253,22 +360,108 @@ mod tests {
     use tempfile::tempdir;
 
     fn mk(default: Decision, allow: &[&str], deny: &[&str]) -> NetworkPolicy {
-        NetworkPolicy { default: default.into(), allow: allow.iter().map(|s| s.to_string()).collect(), deny: deny.iter().map(|s| s.to_string()).collect(), audit: false }
+        NetworkPolicy {
+            default: default.into(),
+            allow: allow.iter().map(|s| s.to_string()).collect(),
+            deny: deny.iter().map(|s| s.to_string()).collect(),
+            audit: false,
+        }
     }
 
-    #[test] fn exact_match_in_allow() { let p = mk(Decision::Deny, &["api.example.com"], &[]); assert_eq!(p.decide("api.example.com"), Decision::Allow); }
-    #[test] fn unknown_host_returns_default() { assert_eq!(mk(Decision::Deny, &["api.example.com"], &[]).decide("evil.example.com"), Decision::Deny); }
-    #[test] fn deny_wins() { let p = mk(Decision::Prompt, &["api.example.com"], &["api.example.com"]); assert_eq!(p.decide("api.example.com"), Decision::Deny); }
-    #[test] fn deny_wins_subdomain() { assert_eq!(mk(Decision::Allow, &["api.example.com"], &[".example.com"]).decide("api.example.com"), Decision::Deny); }
-    #[test] fn subdomain_wildcard() { let p = mk(Decision::Deny, &[".example.com"], &[]); assert_eq!(p.decide("api.example.com"), Decision::Allow); assert_eq!(p.decide("example.com"), Decision::Deny); }
-    #[test] fn case_insensitive() { assert_eq!(mk(Decision::Deny, &["API.Example.COM"], &[]).decide("api.example.com"), Decision::Allow); }
-    #[test] fn trailing_dot_ignored() { assert_eq!(mk(Decision::Deny, &["api.example.com"], &[]).decide("api.example.com."), Decision::Allow); }
-    #[test] fn empty_host_uses_default() { assert_eq!(mk(Decision::Deny, &[], &[]).decide(""), Decision::Deny); }
-    #[test] fn add_allow_dedupes() { let mut p = mk(Decision::Deny, &[], &[]); p.add_allow("Example.COM"); p.add_allow("example.com"); assert_eq!(p.allow.len(), 1); }
-    #[test] fn host_from_url_extracts() { assert_eq!(host_from_url("https://api.example.com/health"), Some("api.example.com".to_string())); assert_eq!(host_from_url("not a url"), None); }
-    #[test] fn auditor_writes_lines() { let dir = tempdir().unwrap(); let a = NetworkAuditor::new(dir.path().join("audit.log"), true); a.record("api.example.com", "fetch_url", "Allow"); let body = std::fs::read_to_string(dir.path().join("audit.log")).unwrap(); assert!(body.contains("Allow")); }
-    #[test] fn session_cache_short_circuits() { let mut d = NetworkPolicyDecider::new(mk(Decision::Prompt, &[], &[]), None); assert_eq!(d.evaluate("api.example.com", "fetch"), Decision::Prompt); d.approve_session("api.example.com", "fetch"); assert_eq!(d.evaluate("api.example.com", "fetch"), Decision::Allow); }
-    #[test] fn approve_persistent_writes_back() { let mut d = NetworkPolicyDecider::new(mk(Decision::Prompt, &[], &[]), None); d.approve_persistent("api.example.com", "fetch"); assert!(d.policy().allow.iter().any(|h| h == "api.example.com")); }
-    #[test] fn decision_parse() { assert_eq!(Decision::parse("allow"), Decision::Allow); assert_eq!(Decision::parse("BLOCK"), Decision::Deny); assert_eq!(Decision::parse("garbage"), Decision::Prompt); }
-    #[test] fn network_denied_carries_host() { let e = NetworkDenied("bad.com".into()); assert_eq!(e.host(), "bad.com"); assert!(format!("{e}").contains("bad.com")); }
+    #[test]
+    fn exact_match_in_allow() {
+        let p = mk(Decision::Deny, &["api.example.com"], &[]);
+        assert_eq!(p.decide("api.example.com"), Decision::Allow);
+    }
+    #[test]
+    fn unknown_host_returns_default() {
+        assert_eq!(
+            mk(Decision::Deny, &["api.example.com"], &[]).decide("evil.example.com"),
+            Decision::Deny
+        );
+    }
+    #[test]
+    fn deny_wins() {
+        let p = mk(Decision::Prompt, &["api.example.com"], &["api.example.com"]);
+        assert_eq!(p.decide("api.example.com"), Decision::Deny);
+    }
+    #[test]
+    fn deny_wins_subdomain() {
+        assert_eq!(
+            mk(Decision::Allow, &["api.example.com"], &[".example.com"]).decide("api.example.com"),
+            Decision::Deny
+        );
+    }
+    #[test]
+    fn subdomain_wildcard() {
+        let p = mk(Decision::Deny, &[".example.com"], &[]);
+        assert_eq!(p.decide("api.example.com"), Decision::Allow);
+        assert_eq!(p.decide("example.com"), Decision::Deny);
+    }
+    #[test]
+    fn case_insensitive() {
+        assert_eq!(
+            mk(Decision::Deny, &["API.Example.COM"], &[]).decide("api.example.com"),
+            Decision::Allow
+        );
+    }
+    #[test]
+    fn trailing_dot_ignored() {
+        assert_eq!(
+            mk(Decision::Deny, &["api.example.com"], &[]).decide("api.example.com."),
+            Decision::Allow
+        );
+    }
+    #[test]
+    fn empty_host_uses_default() {
+        assert_eq!(mk(Decision::Deny, &[], &[]).decide(""), Decision::Deny);
+    }
+    #[test]
+    fn add_allow_dedupes() {
+        let mut p = mk(Decision::Deny, &[], &[]);
+        p.add_allow("Example.COM");
+        p.add_allow("example.com");
+        assert_eq!(p.allow.len(), 1);
+    }
+    #[test]
+    fn host_from_url_extracts() {
+        assert_eq!(
+            host_from_url("https://api.example.com/health"),
+            Some("api.example.com".to_string())
+        );
+        assert_eq!(host_from_url("not a url"), None);
+    }
+    #[test]
+    fn auditor_writes_lines() {
+        let dir = tempdir().unwrap();
+        let a = NetworkAuditor::new(dir.path().join("audit.log"), true);
+        a.record("api.example.com", "fetch_url", "Allow");
+        let body = std::fs::read_to_string(dir.path().join("audit.log")).unwrap();
+        assert!(body.contains("Allow"));
+    }
+    #[test]
+    fn session_cache_short_circuits() {
+        let mut d = NetworkPolicyDecider::new(mk(Decision::Prompt, &[], &[]), None);
+        assert_eq!(d.evaluate("api.example.com", "fetch"), Decision::Prompt);
+        d.approve_session("api.example.com", "fetch");
+        assert_eq!(d.evaluate("api.example.com", "fetch"), Decision::Allow);
+    }
+    #[test]
+    fn approve_persistent_writes_back() {
+        let mut d = NetworkPolicyDecider::new(mk(Decision::Prompt, &[], &[]), None);
+        d.approve_persistent("api.example.com", "fetch");
+        assert!(d.policy().allow.iter().any(|h| h == "api.example.com"));
+    }
+    #[test]
+    fn decision_parse() {
+        assert_eq!(Decision::parse("allow"), Decision::Allow);
+        assert_eq!(Decision::parse("BLOCK"), Decision::Deny);
+        assert_eq!(Decision::parse("garbage"), Decision::Prompt);
+    }
+    #[test]
+    fn network_denied_carries_host() {
+        let e = NetworkDenied("bad.com".into());
+        assert_eq!(e.host(), "bad.com");
+        assert!(format!("{e}").contains("bad.com"));
+    }
 }

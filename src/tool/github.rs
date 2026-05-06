@@ -3,8 +3,8 @@
 //! Provides read-only context tools and guarded write operations
 //! for GitHub Issues and Pull Requests, backed by the `gh` CLI.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct GitHubTool;
 
@@ -62,10 +62,7 @@ impl Tool for GitHubTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let operation = args
-            .get("operation")
-            .and_then(|o| o.as_str())
-            .unwrap_or("");
+        let operation = args.get("operation").and_then(|o| o.as_str()).unwrap_or("");
 
         let repo = args
             .get("repo")
@@ -305,20 +302,16 @@ fn github_list_issues(repo: &str, state: &str) -> ToolResult {
     };
 
     let output = match run_gh(&[
-        "issue",
-        "list",
-        "--repo",
-        &repo,
-        "--state",
-        state,
-        "--limit",
-        "20",
+        "issue", "list", "--repo", &repo, "--state", state, "--limit", "20",
     ]) {
         Ok(o) => o,
         Err(e) => return ToolResult::err(format!("Failed to list issues: {}", e)),
     };
 
-    ToolResult::ok(format!("Issues in {} (state: {}):\n\n{}", repo, state, output))
+    ToolResult::ok(format!(
+        "Issues in {} (state: {}):\n\n{}",
+        repo, state, output
+    ))
 }
 
 /// Validate that evidence is provided for write operations.
@@ -352,14 +345,7 @@ fn github_list_prs(repo: &str, state: &str) -> ToolResult {
     };
 
     let output = match run_gh(&[
-        "pr",
-        "list",
-        "--repo",
-        &repo,
-        "--state",
-        state,
-        "--limit",
-        "20",
+        "pr", "list", "--repo", &repo, "--state", state, "--limit", "20",
     ]) {
         Ok(o) => o,
         Err(e) => return ToolResult::err(format!("Failed to list PRs: {}", e)),

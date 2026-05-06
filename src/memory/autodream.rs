@@ -50,9 +50,7 @@ impl AutoDream {
     ///
     /// Returns a handle that can be used to cancel the task.
     pub fn start(self) -> tokio::task::JoinHandle<anyhow::Result<()>> {
-        tokio::spawn(async move {
-            self.run_loop().await
-        })
+        tokio::spawn(async move { self.run_loop().await })
     }
 
     /// Main loop: consolidate on interval.
@@ -84,7 +82,11 @@ impl AutoDream {
             // Remove expired entries
             if entry.updated_at < cutoff_str {
                 if let Err(e) = self.store.delete(&entry.id) {
-                    tracing::warn!("AutoDream: failed to delete expired memory {}: {}", entry.id, e);
+                    tracing::warn!(
+                        "AutoDream: failed to delete expired memory {}: {}",
+                        entry.id,
+                        e
+                    );
                 } else {
                     removed += 1;
                 }
@@ -92,7 +94,9 @@ impl AutoDream {
             }
 
             // Summarize long entries via length truncation
-            if entry.content.len() > self.config.min_summary_length && entry.insight_type == "conversation" {
+            if entry.content.len() > self.config.min_summary_length
+                && entry.insight_type == "conversation"
+            {
                 let summary = self.create_summary(entry);
                 let summary_entry = MemoryEntry {
                     id: format!("{}-summary", entry.id),
@@ -120,7 +124,10 @@ impl AutoDream {
             }
         }
 
-        Ok(ConsolidationReport { removed, summarized })
+        Ok(ConsolidationReport {
+            removed,
+            summarized,
+        })
     }
 
     /// Create a summary of a memory entry, ending at a sentence boundary.

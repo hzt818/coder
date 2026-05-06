@@ -93,7 +93,10 @@ impl SubAgentRole {
 
     /// Whether this role is read-only
     pub fn is_read_only(&self) -> bool {
-        matches!(self, SubAgentRole::Explore | SubAgentRole::Plan | SubAgentRole::Review)
+        matches!(
+            self,
+            SubAgentRole::Explore | SubAgentRole::Plan | SubAgentRole::Review
+        )
     }
 
     /// Aliases for matching from model input
@@ -104,7 +107,9 @@ impl SubAgentRole {
             SubAgentRole::Plan => &["plan", "planning", "awaiter"],
             SubAgentRole::Review => &["review", "reviewer", "code-review"],
             SubAgentRole::Implementer => &["implementer", "implement", "implementation", "builder"],
-            SubAgentRole::Verifier => &["verifier", "verify", "verification", "validator", "tester"],
+            SubAgentRole::Verifier => {
+                &["verifier", "verify", "verification", "validator", "tester"]
+            }
             SubAgentRole::Custom => &["custom"],
         }
     }
@@ -201,7 +206,11 @@ mod tests {
     #[test]
     fn test_system_prompts_not_empty() {
         for role in &ALL_ROLES {
-            assert!(!role.system_prompt().is_empty(), "System prompt for {:?} should not be empty", role);
+            assert!(
+                !role.system_prompt().is_empty(),
+                "System prompt for {:?} should not be empty",
+                role
+            );
         }
     }
 

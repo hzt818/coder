@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::communication::{TeammateMessage, MessageContent};
+use super::communication::{MessageContent, TeammateMessage};
 use super::task::{TaskAssignment, TaskId};
 use super::teammate::{Teammate, TeammateRole, TeammateStatus};
 
@@ -58,8 +58,7 @@ impl TeamManager {
         agent_type: crate::agent::AgentType,
     ) -> (String, tokio::sync::mpsc::Receiver<TeammateMessage>) {
         let id = Uuid::new_v4().to_string();
-        let (teammate, rx) =
-            Teammate::create_with_channel(id.clone(), name, role, agent_type, 64);
+        let (teammate, rx) = Teammate::create_with_channel(id.clone(), name, role, agent_type, 64);
         self.teammates.insert(id.clone(), teammate);
         (id, rx)
     }

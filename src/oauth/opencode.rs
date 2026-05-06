@@ -32,5 +32,7 @@ pub enum OAuthResult {
 
 /// Run the OAuth flow (placeholder - actual flow opens browser)
 pub async fn run_oauth_flow() -> OAuthResult {
-    OAuthResult::Error("OAuth flow not yet implemented for desktop. Set OPENCODE_API_KEY env var.".to_string())
+    OAuthResult::Error(
+        "OAuth flow not yet implemented for desktop. Set OPENCODE_API_KEY env var.".to_string(),
+    )
 }

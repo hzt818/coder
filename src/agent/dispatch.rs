@@ -70,13 +70,25 @@ mod tests {
 
     #[test]
     fn test_route_to_agent() {
-        assert_eq!(route_to_agent(&AgentType::Coding), get_agent_prompt(&AgentType::Coding));
-        assert_eq!(route_to_agent(&AgentType::Research), get_agent_prompt(&AgentType::Research));
+        assert_eq!(
+            route_to_agent(&AgentType::Coding),
+            get_agent_prompt(&AgentType::Coding)
+        );
+        assert_eq!(
+            route_to_agent(&AgentType::Research),
+            get_agent_prompt(&AgentType::Research)
+        );
     }
 
     #[test]
     fn test_agent_types_have_prompts() {
-        for t in &[AgentType::Coding, AgentType::Research, AgentType::Debug, AgentType::Plan, AgentType::Review] {
+        for t in &[
+            AgentType::Coding,
+            AgentType::Research,
+            AgentType::Debug,
+            AgentType::Plan,
+            AgentType::Review,
+        ] {
             let prompt = get_agent_prompt(t);
             assert!(!prompt.is_empty(), "AgentType {:?} has empty prompt", t);
         }

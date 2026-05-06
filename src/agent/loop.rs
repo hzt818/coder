@@ -1,10 +1,10 @@
 //! Agent loop - the core ReAct conversation loop
 
-use crate::ai::*;
-use crate::tool::*;
+use super::auto_reasoning;
 use super::context::Context;
 use super::types::{AgentType, InteractionMode, ReasoningEffort};
-use super::auto_reasoning;
+use crate::ai::*;
+use crate::tool::*;
 
 #[cfg(feature = "permission")]
 use crate::permission::{Action, PermissionEvaluator};
@@ -138,10 +138,7 @@ impl Agent {
             }
 
             // Block file write/modify operations
-            if tool_name == "file_write"
-                || tool_name == "file_edit"
-                || tool_name == "apply_patch"
-            {
+            if tool_name == "file_write" || tool_name == "file_edit" || tool_name == "apply_patch" {
                 return Some(format!(
                     "'{}' is not allowed in Plan mode. \
                      Use read-only tools like file_read, grep, list_dir.",
@@ -323,18 +320,19 @@ impl Agent {
                             StreamEvent::ToolCallStart(tc) => {
                                 has_tool_call = true;
                                 tool_calls.push(tc.clone());
-                                if tx.send(AgentEvent::ToolCallStart {
-                                    id: tc.id,
-                                    name: tc.name,
-                                }).await.is_err() {
+                                if tx
+                                    .send(AgentEvent::ToolCallStart {
+                                        id: tc.id,
+                                        name: tc.name,
+                                    })
+                                    .await
+                                    .is_err()
+                                {
                                     tracing::warn!("Agent event channel closed, stopping stream");
                                     break;
                                 }
                             }
-                            StreamEvent::Done {
-                                stop_reason,
-                                usage,
-                            } => {
+                            StreamEvent::Done { stop_reason, usage } => {
                                 final_stop_reason = stop_reason;
                                 final_usage = usage;
                             }
@@ -378,10 +376,14 @@ impl Agent {
                         let result = self.tools.execute(&tc.name, tc.arguments.clone()).await;
                         self.context
                             .add_message(Message::tool_result(&tc.id, &result.output));
-                        if tx.send(AgentEvent::ToolResult {
-                            tool_name: tc.name.clone(),
-                            result,
-                        }).await.is_err() {
+                        if tx
+                            .send(AgentEvent::ToolResult {
+                                tool_name: tc.name.clone(),
+                                result,
+                            })
+                            .await
+                            .is_err()
+                        {
                             tracing::warn!("Agent event channel closed during tool result");
                             break;
                         }
@@ -389,10 +391,14 @@ impl Agent {
 
                     if !has_tool_call {
                         // No tool calls — conversation turn is complete, send final Done
-                        if tx.send(AgentEvent::Done {
-                            stop_reason: final_stop_reason,
-                            usage: final_usage,
-                        }).await.is_err() {
+                        if tx
+                            .send(AgentEvent::Done {
+                                stop_reason: final_stop_reason,
+                                usage: final_usage,
+                            })
+                            .await
+                            .is_err()
+                        {
                             tracing::warn!("Agent event channel closed at loop end");
                         }
                         break;
@@ -414,19 +420,13 @@ impl Agent {
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
     /// AI started thinking
-    ThinkingStart {
-        provider: String,
-        model: String,
-    },
+    ThinkingStart { provider: String, model: String },
     /// Text content chunk
     TextChunk(String),
     /// Reasoning/thinking content chunk (reserved for future use; not yet emitted by any provider)
     ReasoningChunk(String),
     /// Tool call started
-    ToolCallStart {
-        id: String,
-        name: String,
-    },
+    ToolCallStart { id: String, name: String },
     /// Tool execution result
     ToolResult {
         tool_name: String,
@@ -440,13 +440,9 @@ pub enum AgentEvent {
     /// Error occurred
     Error(String),
     /// Mode changed
-    ModeChanged {
-        mode: super::InteractionMode,
-    },
+    ModeChanged { mode: super::InteractionMode },
     /// Reasoning effort changed
-    ReasoningEffortChanged {
-        effort: super::ReasoningEffort,
-    },
+    ReasoningEffortChanged { effort: super::ReasoningEffort },
     /// Cost estimate for the turn
     CostEstimate {
         estimate: crate::core::pricing::CostEstimate,

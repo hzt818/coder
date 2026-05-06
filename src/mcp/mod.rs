@@ -6,9 +6,9 @@
 //! - Context7 integration for documentation lookup
 
 pub mod client;
-pub mod server;
 pub mod context7;
+pub mod server;
 
 pub use client::McpClient;
-pub use server::McpServer;
 pub use context7::Context7Client;
+pub use server::McpServer;

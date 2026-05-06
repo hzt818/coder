@@ -3,10 +3,10 @@
 //! Subagents are short-lived agents with isolated context, spawned
 //! to accomplish a specific task and report results back to a supervisor.
 
+pub mod roles;
 pub mod spawn;
 pub mod supervisor;
-pub mod roles;
 
-pub use spawn::{SubagentHandle, SpawnConfig, spawn_subagent};
-pub use supervisor::{Supervisor, SubagentResult};
-pub use roles::{SubAgentRole, parse_role, ALL_ROLES};
+pub use roles::{parse_role, SubAgentRole, ALL_ROLES};
+pub use spawn::{spawn_subagent, SpawnConfig, SubagentHandle};
+pub use supervisor::{SubagentResult, Supervisor};

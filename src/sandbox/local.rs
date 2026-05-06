@@ -90,7 +90,11 @@ mod tests {
         let sandbox = LocalSandbox::new();
         let result = sandbox.execute("echo hello", ".", 30).await;
         assert_eq!(result.exit_code, 0);
-        assert!(result.stdout.contains("hello"), "stdout: {:?}", result.stdout);
+        assert!(
+            result.stdout.contains("hello"),
+            "stdout: {:?}",
+            result.stdout
+        );
         assert!(!result.timed_out);
     }
 

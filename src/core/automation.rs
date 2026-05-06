@@ -110,12 +110,26 @@ impl AutomationManager {
         cwd: Option<&str>,
         status: Option<&str>,
     ) -> bool {
-        if let Some(auto) = self.automations.iter_mut().find(|a| a.id == id || a.name == id) {
-            if let Some(n) = name { auto.name = n.to_string(); }
-            if let Some(s) = schedule { auto.schedule = s.to_string(); }
-            if let Some(p) = prompt { auto.prompt = p.to_string(); }
-            if let Some(c) = cwd { auto.cwd = c.to_string(); }
-            if let Some(s) = status { auto.status = s.to_string(); }
+        if let Some(auto) = self
+            .automations
+            .iter_mut()
+            .find(|a| a.id == id || a.name == id)
+        {
+            if let Some(n) = name {
+                auto.name = n.to_string();
+            }
+            if let Some(s) = schedule {
+                auto.schedule = s.to_string();
+            }
+            if let Some(p) = prompt {
+                auto.prompt = p.to_string();
+            }
+            if let Some(c) = cwd {
+                auto.cwd = c.to_string();
+            }
+            if let Some(s) = status {
+                auto.status = s.to_string();
+            }
             true
         } else {
             false
@@ -123,7 +137,11 @@ impl AutomationManager {
     }
 
     pub fn set_status(&mut self, id: &str, status: AutomationStatus) -> bool {
-        if let Some(auto) = self.automations.iter_mut().find(|a| a.id == id || a.name == id) {
+        if let Some(auto) = self
+            .automations
+            .iter_mut()
+            .find(|a| a.id == id || a.name == id)
+        {
             auto.status = status.as_str().to_string();
             true
         } else {
@@ -138,9 +156,15 @@ impl AutomationManager {
     }
 
     pub fn run_now(&mut self, id: &str) -> Option<String> {
-        let auto = self.automations.iter_mut().find(|a| a.id == id || a.name == id)?;
+        let auto = self
+            .automations
+            .iter_mut()
+            .find(|a| a.id == id || a.name == id)?;
         auto.last_run = Some(chrono::Utc::now().to_rfc3339());
-        Some(format!("Executed automation '{}': {}", auto.name, auto.prompt))
+        Some(format!(
+            "Executed automation '{}': {}",
+            auto.name, auto.prompt
+        ))
     }
 
     pub fn format_list(&self) -> String {
@@ -243,7 +267,14 @@ mod tests {
     fn test_update() {
         let mut mgr = AutomationManager::new();
         let auto = mgr.create("test", "0 0 * * *", "old");
-        assert!(mgr.update(&auto.id, Some("renamed"), Some("*/5 * * * *"), Some("new prompt"), None, None));
+        assert!(mgr.update(
+            &auto.id,
+            Some("renamed"),
+            Some("*/5 * * * *"),
+            Some("new prompt"),
+            None,
+            None
+        ));
         let updated = mgr.get(&auto.id).unwrap();
         assert_eq!(updated.name, "renamed");
         assert_eq!(updated.prompt, "new prompt");
@@ -253,7 +284,13 @@ mod tests {
     fn test_status_transitions() {
         assert_eq!(AutomationStatus::Active.as_str(), "active");
         assert_eq!(AutomationStatus::Paused.as_str(), "paused");
-        assert_eq!(AutomationStatus::from_str("paused"), AutomationStatus::Paused);
-        assert_eq!(AutomationStatus::from_str("unknown"), AutomationStatus::Active);
+        assert_eq!(
+            AutomationStatus::from_str("paused"),
+            AutomationStatus::Paused
+        );
+        assert_eq!(
+            AutomationStatus::from_str("unknown"),
+            AutomationStatus::Active
+        );
     }
 }

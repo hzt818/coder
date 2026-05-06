@@ -1,7 +1,7 @@
 //! File write tool
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct FileWriteTool;
 
@@ -33,17 +33,13 @@ impl Tool for FileWriteTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let path = args.get("path")
-            .and_then(|p| p.as_str())
-            .unwrap_or("");
+        let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
 
         if path.is_empty() {
             return ToolResult::err("Path is required");
         }
 
-        let content = args.get("content")
-            .and_then(|c| c.as_str())
-            .unwrap_or("");
+        let content = args.get("content").and_then(|c| c.as_str()).unwrap_or("");
 
         // ── Path traversal protection ──
         // Resolve the path safely: canonicalize an existing ancestor, then
@@ -59,8 +55,7 @@ impl Tool for FileWriteTool {
             loop {
                 match ancestor {
                     Some(p) if p.exists() => {
-                        let base = std::fs::canonicalize(p)
-                            .unwrap_or_else(|_| p.to_path_buf());
+                        let base = std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
                         let mut result = base;
                         for comp in tails.iter().rev() {
                             result.push(comp);
@@ -95,15 +90,27 @@ impl Tool for FileWriteTool {
         if let Some(parent) = resolved.parent() {
             if !parent.exists() {
                 if let Err(e) = std::fs::create_dir_all(parent) {
-                    return ToolResult::err(format!("Failed to create directory '{}': {}", parent.display(), e));
+                    return ToolResult::err(format!(
+                        "Failed to create directory '{}': {}",
+                        parent.display(),
+                        e
+                    ));
                 }
             }
         }
 
         // Write to the resolved canonical path
         match std::fs::write(&resolved, content) {
-            Ok(_) => ToolResult::ok(format!("Successfully wrote {} bytes to {}", content.len(), resolved.display())),
-            Err(e) => ToolResult::err(format!("Failed to write file '{}': {}", resolved.display(), e)),
+            Ok(_) => ToolResult::ok(format!(
+                "Successfully wrote {} bytes to {}",
+                content.len(),
+                resolved.display()
+            )),
+            Err(e) => ToolResult::err(format!(
+                "Failed to write file '{}': {}",
+                resolved.display(),
+                e
+            )),
         }
     }
 
@@ -125,7 +132,9 @@ mod tests {
     #[tokio::test]
     async fn test_file_write_empty_path() {
         let tool = FileWriteTool;
-        let result = tool.execute(serde_json::json!({"path": "", "content": "test"})).await;
+        let result = tool
+            .execute(serde_json::json!({"path": "", "content": "test"}))
+            .await;
         assert!(!result.success);
     }
 
@@ -136,7 +145,9 @@ mod tests {
         let file_path = tmp.path().join("test.txt");
         let path_str = file_path.to_str().unwrap();
 
-        let result = tool.execute(serde_json::json!({"path": path_str, "content": "hello world"})).await;
+        let result = tool
+            .execute(serde_json::json!({"path": path_str, "content": "hello world"}))
+            .await;
         assert!(result.success);
         assert!(result.output.contains("11 bytes"));
 

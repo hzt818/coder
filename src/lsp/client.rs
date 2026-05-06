@@ -68,12 +68,22 @@ impl LspClient {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
-            .map_err(|e| anyhow::anyhow!("Failed to start LSP server '{}': {}", self.server_config.command, e))?;
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to start LSP server '{}': {}",
+                    self.server_config.command,
+                    e
+                )
+            })?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Failed to open stdin for LSP server"))?;
 
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| anyhow::anyhow!("Failed to open stdout for LSP server"))?;
 
         let mut process_lock = self.process.lock().await;
@@ -131,13 +141,18 @@ impl LspClient {
         }
 
         // Send initialized notification
-        self.send_notification("initialized", serde_json::json!({})).await?;
+        self.send_notification("initialized", serde_json::json!({}))
+            .await?;
 
         Ok(())
     }
 
     /// Send a JSON-RPC request and wait for the response.
-    pub async fn send_request(&self, method: &str, params: serde_json::Value) -> anyhow::Result<serde_json::Value> {
+    pub async fn send_request(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> anyhow::Result<serde_json::Value> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         let request = serde_json::json!({
@@ -152,7 +167,11 @@ impl LspClient {
     }
 
     /// Send a JSON-RPC notification (no response expected).
-    pub async fn send_notification(&self, method: &str, params: serde_json::Value) -> anyhow::Result<()> {
+    pub async fn send_notification(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> anyhow::Result<()> {
         let notification = serde_json::json!({
             "jsonrpc": "2.0",
             "method": method,
@@ -168,7 +187,8 @@ impl LspClient {
         let header = format!("Content-Length: {}\r\n\r\n", content.len());
 
         let mut stdin = self.stdin.lock().await;
-        let stdin = stdin.as_mut()
+        let stdin = stdin
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("LSP server not connected"))?;
 
         stdin.write_all(header.as_bytes()).await?;
@@ -181,7 +201,8 @@ impl LspClient {
     /// Read a JSON-RPC response with the given ID.
     async fn read_response(&self, _expected_id: u64) -> anyhow::Result<serde_json::Value> {
         let mut reader_lock = self.reader.lock().await;
-        let reader = reader_lock.as_mut()
+        let reader = reader_lock
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("LSP server not connected"))?;
 
         let mut line = String::new();
@@ -190,7 +211,9 @@ impl LspClient {
         // Read headers
         loop {
             line.clear();
-            let bytes_read = reader.read_line(&mut line).await
+            let bytes_read = reader
+                .read_line(&mut line)
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to read LSP response: {}", e))?;
             if bytes_read == 0 {
                 anyhow::bail!("LSP server closed connection");
@@ -202,7 +225,9 @@ impl LspClient {
             }
             if let Some(len_str) = trimmed.strip_prefix("Content-Length:") {
                 content_length = Some(
-                    len_str.trim().parse()
+                    len_str
+                        .trim()
+                        .parse()
                         .map_err(|e| anyhow::anyhow!("Invalid Content-Length: {}", e))?,
                 );
             }
@@ -213,7 +238,9 @@ impl LspClient {
 
         // Read the JSON body
         let mut body = vec![0u8; len];
-        reader.read_exact(&mut body).await
+        reader
+            .read_exact(&mut body)
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to read LSP response body: {}", e))?;
 
         let response: serde_json::Value = serde_json::from_slice(&body)
@@ -221,13 +248,17 @@ impl LspClient {
 
         // Check for error response
         if let Some(error) = response.get("error") {
-            let msg = error.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown error");
+            let msg = error
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Unknown error");
             let code = error.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
             anyhow::bail!("LSP error ({}): {}", code, msg);
         }
 
         // Return the result field
-        response.get("result")
+        response
+            .get("result")
             .cloned()
             .ok_or_else(|| anyhow::anyhow!("LSP response missing 'result' field"))
     }

@@ -20,14 +20,18 @@ pub fn search_sessions(query: &str, max_results: usize) -> Vec<SessionSearchResu
             if path.extension().map(|e| e == "json").unwrap_or(false) {
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     let content_lower = content.to_lowercase();
-                    let match_count = query_terms.iter()
+                    let match_count = query_terms
+                        .iter()
                         .filter(|t| content_lower.contains(*t))
                         .count();
 
                     if match_count > 0 {
                         // Extract session title and message count from JSON
                         let title = extract_title(&content).unwrap_or_else(|| {
-                            path.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown").to_string()
+                            path.file_stem()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or("unknown")
+                                .to_string()
                         });
                         let msg_count = content.matches("\"role\"").count();
                         let preview = extract_preview(&content, query);
@@ -70,7 +74,11 @@ pub fn format_search_results(results: &[SessionSearchResult]) -> String {
     for (i, r) in results.iter().enumerate() {
         output.push_str(&format!(
             "{}. {} ({} msgs, {} matches)\n   Preview: {}\n\n",
-            i + 1, r.title, r.message_count, r.match_count, r.preview
+            i + 1,
+            r.title,
+            r.message_count,
+            r.match_count,
+            r.preview
         ));
     }
     output
@@ -78,9 +86,17 @@ pub fn format_search_results(results: &[SessionSearchResult]) -> String {
 
 fn extract_title(json: &str) -> Option<String> {
     if let Ok(val) = serde_json::from_str::<serde_json::Value>(json) {
-        val.get("title").and_then(|t| t.as_str()).map(|s| s.to_string())
-            .or_else(|| val.get("id").and_then(|t| t.as_str()).map(|s| s.to_string()))
-    } else { None }
+        val.get("title")
+            .and_then(|t| t.as_str())
+            .map(|s| s.to_string())
+            .or_else(|| {
+                val.get("id")
+                    .and_then(|t| t.as_str())
+                    .map(|s| s.to_string())
+            })
+    } else {
+        None
+    }
 }
 
 fn extract_preview(json: &str, query: &str) -> String {

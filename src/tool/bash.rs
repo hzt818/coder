@@ -1,7 +1,7 @@
 //! Bash tool - executes shell commands
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 /// Tool for executing shell commands
 pub struct BashTool {
@@ -54,7 +54,8 @@ impl Tool for BashTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let command = args.get("command")
+        let command = args
+            .get("command")
             .and_then(|c| c.as_str())
             .unwrap_or("")
             .to_string();
@@ -63,11 +64,13 @@ impl Tool for BashTool {
             return ToolResult::err("Command is required");
         }
 
-        let timeout = args.get("timeout")
+        let timeout = args
+            .get("timeout")
             .and_then(|t| t.as_u64())
             .unwrap_or(self.default_timeout);
 
-        let workdir = args.get("workdir")
+        let workdir = args
+            .get("workdir")
             .and_then(|d| d.as_str())
             .unwrap_or(".")
             .to_string();
@@ -106,15 +109,19 @@ async fn execute_command(
     timeout_secs: u64,
     max_output_bytes: usize,
 ) -> Result<String, String> {
-    use tokio::process::Command;
     use std::time::Duration;
+    use tokio::process::Command;
 
     let shell = if cfg!(target_os = "windows") {
         "cmd.exe"
     } else {
         "sh"
     };
-    let shell_arg = if cfg!(target_os = "windows") { "/C" } else { "-c" };
+    let shell_arg = if cfg!(target_os = "windows") {
+        "/C"
+    } else {
+        "-c"
+    };
 
     let output = tokio::time::timeout(
         Duration::from_secs(timeout_secs),
@@ -152,7 +159,9 @@ async fn execute_command(
         if result.len() + chunk.len() > max_output_bytes {
             let remaining = max_output_bytes.saturating_sub(result.len());
             let safe_end = chunk.floor_char_boundary(remaining);
-            if needs_sep { result.push('\n'); }
+            if needs_sep {
+                result.push('\n');
+            }
             result.push_str(&chunk[..safe_end]);
             truncated = true;
         } else {

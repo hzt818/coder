@@ -2,8 +2,8 @@
 //!
 //! Supports SQL queries against local SQLite databases.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct DbQueryTool;
 
@@ -36,15 +36,14 @@ impl Tool for DbQueryTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
-        let query = args.get("query")
-            .and_then(|q| q.as_str())
-            .unwrap_or("");
+        let query = args.get("query").and_then(|q| q.as_str()).unwrap_or("");
 
         if query.is_empty() {
             return ToolResult::err("SQL query is required");
         }
 
-        let db_path = args.get("db_path")
+        let db_path = args
+            .get("db_path")
             .and_then(|c| c.as_str())
             .unwrap_or("./data.db");
 
@@ -66,7 +65,8 @@ async fn execute_query(db_path: &str, query: &str) -> Result<String, String> {
         .await
         .map_err(|e| format!("Failed to open database '{}': {}", db_path, e))?;
 
-    let conn = db.connect()
+    let conn = db
+        .connect()
         .map_err(|e| format!("Failed to connect: {}", e))?;
 
     let trimmed = query.trim().to_uppercase();
@@ -75,14 +75,17 @@ async fn execute_query(db_path: &str, query: &str) -> Result<String, String> {
         || trimmed.starts_with("EXPLAIN");
 
     if is_query {
-        let mut rows = conn.query(query, libsql::params![])
+        let mut rows = conn
+            .query(query, libsql::params![])
             .await
             .map_err(|e| format!("Query failed: {}", e))?;
 
         let mut result = format!("Query: {}\n\n", query);
         let mut row_count = 0u64;
 
-        while let Some(row) = rows.next().await
+        while let Some(row) = rows
+            .next()
+            .await
             .map_err(|e| format!("Row read error: {}", e))?
         {
             let mut values = Vec::new();

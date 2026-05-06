@@ -1,7 +1,7 @@
 //! TUI application state machine
 
-use crate::agent::Agent;
 use crate::agent::r#loop::AgentEvent;
+use crate::agent::Agent;
 use crate::agent::{InteractionMode, ReasoningEffort};
 use crate::session::manager::SessionManager;
 use crate::tui::help;
@@ -170,7 +170,11 @@ impl App {
             .filter(|o| o.status.success())
             .and_then(|o| {
                 let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                if s.is_empty() { None } else { Some(s) }
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s)
+                }
             })
     }
 
@@ -384,7 +388,10 @@ impl App {
 
             let selected_item = &items[selected];
             // Extract just the name part after the icon
-            let name = selected_item.split_once(' ').map(|(_, n)| n).unwrap_or(selected_item);
+            let name = selected_item
+                .split_once(' ')
+                .map(|(_, n)| n)
+                .unwrap_or(selected_item);
 
             // Find the @ position
             if let Some(at_pos) = self.input[..self.cursor_pos].rfind('@') {
@@ -406,9 +413,9 @@ impl App {
     pub fn update_mention_filter(&mut self) {
         // Extract query first (avoid simultaneous borrows)
         let extracted = if let InputSubmode::Mention { .. } = self.input_submode {
-            self.input[..self.cursor_pos].rfind('@').map(|at_pos| {
-                self.input[at_pos + 1..self.cursor_pos].to_string()
-            })
+            self.input[..self.cursor_pos]
+                .rfind('@')
+                .map(|at_pos| self.input[at_pos + 1..self.cursor_pos].to_string())
         } else {
             None
         };
@@ -416,7 +423,12 @@ impl App {
         match extracted {
             Some(extracted_query) => {
                 let candidates = self.mention_candidates(&extracted_query);
-                if let InputSubmode::Mention { ref mut query, ref mut items, ref mut selected } = self.input_submode {
+                if let InputSubmode::Mention {
+                    ref mut query,
+                    ref mut items,
+                    ref mut selected,
+                } = self.input_submode
+                {
                     // Only reset selection if the query actually changed (new filter results)
                     if *query != extracted_query {
                         *query = extracted_query;
@@ -468,10 +480,18 @@ impl App {
 
     /// Execute a direct shell command (!)
     fn execute_shell(&self, cmd: &str) -> String {
-        let output = std::process::Command::new(if cfg!(target_os = "windows") { "cmd" } else { "sh" })
-            .arg(if cfg!(target_os = "windows") { "/C" } else { "-c" })
-            .arg(cmd)
-            .output();
+        let output = std::process::Command::new(if cfg!(target_os = "windows") {
+            "cmd"
+        } else {
+            "sh"
+        })
+        .arg(if cfg!(target_os = "windows") {
+            "/C"
+        } else {
+            "-c"
+        })
+        .arg(cmd)
+        .output();
 
         match output {
             Ok(o) => {
@@ -522,7 +542,9 @@ impl App {
                     self.agent.agent_type(),
                     self.agent.tools().len(),
                     self.agent.session().message_count(),
-                    crate::util::format::format_tokens(self.total_input_tokens + self.total_output_tokens),
+                    crate::util::format::format_tokens(
+                        self.total_input_tokens + self.total_output_tokens
+                    ),
                     crate::util::format::format_tokens(128_000),
                 );
                 if self.provider_name == "opencode" {
@@ -538,7 +560,9 @@ impl App {
                     self.messages.len(),
                     self.total_input_tokens,
                     self.total_output_tokens,
-                    crate::util::format::format_tokens(self.total_input_tokens + self.total_output_tokens),
+                    crate::util::format::format_tokens(
+                        self.total_input_tokens + self.total_output_tokens
+                    ),
                 );
                 (true, Some(ctx))
             }
@@ -549,7 +573,11 @@ impl App {
                 (true, Some(result))
             }
             "diff" => {
-                let flag = if args == "--staged" || args == "--cached" { " --staged" } else { "" };
+                let flag = if args == "--staged" || args == "--cached" {
+                    " --staged"
+                } else {
+                    ""
+                };
                 let result = self.execute_shell(&format!("git diff{}", flag));
                 (true, Some(result))
             }
@@ -581,7 +609,10 @@ impl App {
                 if args.is_empty() {
                     (true, Some("Usage: /search <pattern> [path]".to_string()))
                 } else {
-                    let result = self.execute_shell(&format!("rg --line-number --color never '{}'", args.replace('\'', "'\\''")));
+                    let result = self.execute_shell(&format!(
+                        "rg --line-number --color never '{}'",
+                        args.replace('\'', "'\\''")
+                    ));
                     (true, Some(result))
                 }
             }
@@ -616,7 +647,9 @@ impl App {
                     (true, Some("No messages to compact.".to_string()))
                 } else {
                     // Convert ChatMessages to AI Messages for compaction
-                    let ai_msgs: Vec<crate::ai::Message> = self.messages.iter()
+                    let ai_msgs: Vec<crate::ai::Message> = self
+                        .messages
+                        .iter()
                         .filter(|m| m.role == "user" || m.role == "assistant")
                         .map(|m| {
                             if m.role == "user" {
@@ -637,7 +670,10 @@ impl App {
                             let split_at = self.messages.len().saturating_sub(recent_count);
                             self.messages.drain(..split_at);
                         }
-                        (true, Some(crate::core::compaction::format_compaction_result(&result)))
+                        (
+                            true,
+                            Some(crate::core::compaction::format_compaction_result(&result)),
+                        )
                     } else {
                         (true, Some("No compaction needed.".to_string()))
                     }
@@ -647,14 +683,22 @@ impl App {
                 let summary = format!(
                     "Conversation summary:\n- Messages: {}\n- Tokens: {}\n- Tools used: {}",
                     self.messages.len(),
-                    crate::util::format::format_tokens(self.total_input_tokens + self.total_output_tokens),
+                    crate::util::format::format_tokens(
+                        self.total_input_tokens + self.total_output_tokens
+                    ),
                     self.agent.tools().len(),
                 );
                 (true, Some(summary))
             }
             "review" | "r" => {
                 let result = self.execute_shell("git diff --stat");
-                (true, Some(format!("── Code Review ──\n\nChanges:\n{}\n\nUse /diff to see full diff.", result)))
+                (
+                    true,
+                    Some(format!(
+                        "── Code Review ──\n\nChanges:\n{}\n\nUse /diff to see full diff.",
+                        result
+                    )),
+                )
             }
             "plan" => {
                 let plan = format!(
@@ -666,7 +710,11 @@ impl App {
                      4. Testing - Verify correctness\n\
                      5. Review - Quality check\n\n\
                      Start with step 1.",
-                    if args.is_empty() { "Not specified" } else { args }
+                    if args.is_empty() {
+                        "Not specified"
+                    } else {
+                        args
+                    }
                 );
                 (true, Some(plan))
             }
@@ -684,23 +732,42 @@ impl App {
             }
             "explain" => {
                 if args.is_empty() {
-                    (true, Some("Usage: /explain <code_or_file_path>".to_string()))
+                    (
+                        true,
+                        Some("Usage: /explain <code_or_file_path>".to_string()),
+                    )
                 } else {
                     (true, Some(format!("── Explanation for: {} ──\n\n(Explain mode: AI-powered explanation coming soon)\n\n{}", args, args)))
                 }
             }
             "doc" => {
                 if args.is_empty() {
-                    (true, Some("Usage: /doc <target>\nExamples: /doc src/main.rs, /doc README.md".to_string()))
+                    (
+                        true,
+                        Some(
+                            "Usage: /doc <target>\nExamples: /doc src/main.rs, /doc README.md"
+                                .to_string(),
+                        ),
+                    )
                 } else {
-                    (true, Some(format!("── Documentation for: {} ──\n\n(Doc generation coming soon)", args)))
+                    (
+                        true,
+                        Some(format!(
+                            "── Documentation for: {} ──\n\n(Doc generation coming soon)",
+                            args
+                        )),
+                    )
                 }
             }
 
             // ── Config commands ──
             "config" => {
                 let config_path = crate::util::path::coder_dir().join("config.toml");
-                let exists = if config_path.exists() { "Yes" } else { "No (using defaults)" };
+                let exists = if config_path.exists() {
+                    "Yes"
+                } else {
+                    "No (using defaults)"
+                };
                 let info = format!(
                     "── Configuration ──\n\n\
                      Config file: {}\nExists: {}\n\n\
@@ -733,7 +800,9 @@ impl App {
             "memory" => {
                 let session_path = crate::util::path::sessions_dir();
                 let count = if session_path.exists() {
-                    std::fs::read_dir(&session_path).map(|e| e.count()).unwrap_or(0)
+                    std::fs::read_dir(&session_path)
+                        .map(|e| e.count())
+                        .unwrap_or(0)
                 } else {
                     0
                 };
@@ -769,7 +838,9 @@ impl App {
                      Costs are estimates based on model pricing.",
                     crate::util::format::format_tokens(self.total_input_tokens),
                     crate::util::format::format_tokens(self.total_output_tokens),
-                    crate::util::format::format_tokens(self.total_input_tokens + self.total_output_tokens),
+                    crate::util::format::format_tokens(
+                        self.total_input_tokens + self.total_output_tokens
+                    ),
                     self.session_cost,
                     if self.total_input_tokens > 0 {
                         self.session_cost / (self.total_input_tokens as f64 / 1000.0)
@@ -789,13 +860,22 @@ impl App {
                 let lower = args.to_lowercase();
                 if lower == "plan" || lower == "p" {
                     self.interaction_mode = InteractionMode::Plan;
-                    (true, Some("Switched to Plan mode (read-only, planning focus)".to_string()))
+                    (
+                        true,
+                        Some("Switched to Plan mode (read-only, planning focus)".to_string()),
+                    )
                 } else if lower == "agent" || lower == "a" {
                     self.interaction_mode = InteractionMode::Agent;
-                    (true, Some("Switched to Agent mode (interactive with approval)".to_string()))
+                    (
+                        true,
+                        Some("Switched to Agent mode (interactive with approval)".to_string()),
+                    )
                 } else if lower == "yolo" || lower == "y" {
                     self.interaction_mode = InteractionMode::Yolo;
-                    (true, Some("Switched to YOLO mode (auto-approve all tools)".to_string()))
+                    (
+                        true,
+                        Some("Switched to YOLO mode (auto-approve all tools)".to_string()),
+                    )
                 } else {
                     let msg = format!(
                         "Current mode: {} {}\n\nAvailable modes:\n  /mode plan  - Read-only investigation\n  /mode agent - Interactive with approvals (default)\n  /mode yolo  - Auto-approve all tools\n\nShortcut: Tab cycles through modes",
@@ -821,7 +901,13 @@ impl App {
                     (true, Some("Reasoning effort set to: max".to_string()))
                 } else if lower == "auto" {
                     self.reasoning_effort = ReasoningEffort::Auto;
-                    (true, Some("Reasoning effort set to: auto (automatic selection based on prompt)".to_string()))
+                    (
+                        true,
+                        Some(
+                            "Reasoning effort set to: auto (automatic selection based on prompt)"
+                                .to_string(),
+                        ),
+                    )
                 } else {
                     let msg = format!(
                         "Current reasoning effort: {}\n\nAvailable:\n  /effort off   - No extended thinking\n  /effort low    - Light reasoning\n  /effort high   - Standard reasoning (default)\n  /effort max    - Maximum reasoning\n  /effort auto   - Automatic selection\n\nShortcut: Shift+Tab cycles levels",
@@ -831,7 +917,13 @@ impl App {
                 }
             }
 
-            _ => (true, Some(format!("Unknown command: /{}\nTry: /help for all commands", command))),
+            _ => (
+                true,
+                Some(format!(
+                    "Unknown command: /{}\nTry: /help for all commands",
+                    command
+                )),
+            ),
         }
     }
 
@@ -855,7 +947,11 @@ impl App {
         let display_content = match &command {
             InputCommand::Shell(cmd) => format!("!{}", cmd),
             InputCommand::Help(topic) => {
-                if topic.is_empty() { "?".to_string() } else { format!("?{}", topic) }
+                if topic.is_empty() {
+                    "?".to_string()
+                } else {
+                    format!("?{}", topic)
+                }
             }
             InputCommand::Slash(cmd) => format!("/{}", cmd),
             InputCommand::Chat => input.clone(),
@@ -938,12 +1034,20 @@ impl App {
                 if let Some(last) = self.messages.last_mut() {
                     for tc in last.tool_calls.iter_mut() {
                         if tc.tool_name == tool_name {
-                            tc.status = if result.success { "success".into() } else { "error".into() };
+                            tc.status = if result.success {
+                                "success".into()
+                            } else {
+                                "error".into()
+                            };
                             tc.output = result.output.clone();
                         }
                     }
                 }
-                self.status = format!("🔧 {}: {}", tool_name, if result.success { "OK" } else { "Failed" });
+                self.status = format!(
+                    "🔧 {}: {}",
+                    tool_name,
+                    if result.success { "OK" } else { "Failed" }
+                );
             }
             AgentEvent::Done { stop_reason, usage } => {
                 if let Some(usage) = usage {
@@ -1018,11 +1122,19 @@ impl App {
     /// Estimate the maximum scroll offset for the current messages.
     /// Each message contributes header + content lines + tool call lines + spacing.
     fn max_scroll(&self) -> usize {
-        let line_count: usize = self.messages.iter().map(|msg| {
-            let content_lines = msg.content.lines().count();
-            let tool_lines: usize = msg.tool_calls.iter().map(|tc| tc.output.lines().count() + 2).sum();
-            3 + content_lines + tool_lines // header + content + tools
-        }).sum();
+        let line_count: usize = self
+            .messages
+            .iter()
+            .map(|msg| {
+                let content_lines = msg.content.lines().count();
+                let tool_lines: usize = msg
+                    .tool_calls
+                    .iter()
+                    .map(|tc| tc.output.lines().count() + 2)
+                    .sum();
+                3 + content_lines + tool_lines // header + content + tools
+            })
+            .sum();
         line_count.saturating_sub(10) // subtract ~10 for visible area
     }
 

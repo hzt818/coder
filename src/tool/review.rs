@@ -3,14 +3,16 @@
 //! Analyzes code changes and produces structured output with
 //! issues, suggestions, and overall assessment.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct ReviewTool;
 
 #[async_trait]
 impl Tool for ReviewTool {
-    fn name(&self) -> &str { "review" }
+    fn name(&self) -> &str {
+        "review"
+    }
     fn description(&self) -> &str {
         "Review code changes: analyze diffs, find issues, suggest improvements. Returns structured output."
     }
@@ -28,7 +30,9 @@ impl Tool for ReviewTool {
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let target = args.get("target").and_then(|t| t.as_str()).unwrap_or("");
-        if target.is_empty() { return ToolResult::err("target is required"); }
+        if target.is_empty() {
+            return ToolResult::err("target is required");
+        }
 
         let mut output = String::new();
         output.push_str("── Code Review ──\n\n");
@@ -37,7 +41,8 @@ impl Tool for ReviewTool {
         if target == "git diff" || target == "diff" {
             let diff = std::process::Command::new("git")
                 .args(["diff", "--stat"])
-                .output().ok();
+                .output()
+                .ok();
             match diff {
                 Some(o) if o.status.success() => {
                     let stat = String::from_utf8_lossy(&o.stdout);
@@ -45,7 +50,8 @@ impl Tool for ReviewTool {
 
                     let full_diff = std::process::Command::new("git")
                         .args(["diff"])
-                        .output().ok();
+                        .output()
+                        .ok();
                     if let Some(d) = full_diff {
                         if d.status.success() {
                             let diff_text = String::from_utf8_lossy(&d.stdout);
@@ -56,7 +62,10 @@ impl Tool for ReviewTool {
                                 output.push('\n');
                             }
                             if lines.len() > max_lines {
-                                output.push_str(&format!("... ({} more lines)\n", lines.len() - max_lines));
+                                output.push_str(&format!(
+                                    "... ({} more lines)\n",
+                                    lines.len() - max_lines
+                                ));
                             }
                         }
                     }
@@ -71,7 +80,11 @@ impl Tool for ReviewTool {
             match std::fs::read_to_string(target) {
                 Ok(content) => {
                     let lines: Vec<&str> = content.lines().collect();
-                    output.push_str(&format!("Reviewing file: {} ({} lines)\n\n", target, lines.len()));
+                    output.push_str(&format!(
+                        "Reviewing file: {} ({} lines)\n\n",
+                        target,
+                        lines.len()
+                    ));
                     for (i, line) in lines.iter().enumerate().take(100) {
                         output.push_str(&format!("{:4}: {}\n", i + 1, line));
                     }
@@ -99,13 +112,27 @@ impl Tool for ReviewTool {
 
         ToolResult::ok(output)
     }
-    fn requires_permission(&self) -> bool { false }
+    fn requires_permission(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn test_name() { assert_eq!(ReviewTool.name(), "review"); }
-    #[tokio::test] async fn test_empty() { assert!(!ReviewTool.execute(serde_json::json!({})).await.success); }
-    #[tokio::test] async fn test_code_block() { let r = ReviewTool.execute(serde_json::json!({"target":"fn main() {}"})).await; assert!(r.success); }
+    #[test]
+    fn test_name() {
+        assert_eq!(ReviewTool.name(), "review");
+    }
+    #[tokio::test]
+    async fn test_empty() {
+        assert!(!ReviewTool.execute(serde_json::json!({})).await.success);
+    }
+    #[tokio::test]
+    async fn test_code_block() {
+        let r = ReviewTool
+            .execute(serde_json::json!({"target":"fn main() {}"}))
+            .await;
+        assert!(r.success);
+    }
 }

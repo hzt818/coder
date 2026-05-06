@@ -5,14 +5,16 @@
 //! with a FIM-specific prompt. Falls back to heuristic completion when
 //! no AI provider is configured.
 
-use async_trait::async_trait;
 use super::*;
+use async_trait::async_trait;
 
 pub struct FimEditTool;
 
 #[async_trait]
 impl Tool for FimEditTool {
-    fn name(&self) -> &str { "fim_edit" }
+    fn name(&self) -> &str {
+        "fim_edit"
+    }
 
     fn description(&self) -> &str {
         concat!(
@@ -36,10 +38,14 @@ impl Tool for FimEditTool {
 
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let path = args.get("path").and_then(|p| p.as_str()).unwrap_or("");
-        if path.is_empty() { return ToolResult::err("Path is required"); }
+        if path.is_empty() {
+            return ToolResult::err("Path is required");
+        }
 
         let line = args.get("line").and_then(|l| l.as_i64()).unwrap_or(-1);
-        if line < 0 { return ToolResult::err("Line must be a non-negative integer"); }
+        if line < 0 {
+            return ToolResult::err("Line must be a non-negative integer");
+        }
         let line_idx = line as usize;
 
         let content = match std::fs::read_to_string(path) {
@@ -49,12 +55,27 @@ impl Tool for FimEditTool {
 
         let lines: Vec<&str> = content.lines().collect();
         if line_idx > lines.len() {
-            return ToolResult::err(format!("Line {} beyond file length {}", line_idx, lines.len()));
+            return ToolResult::err(format!(
+                "Line {} beyond file length {}",
+                line_idx,
+                lines.len()
+            ));
         }
 
-        let prefix = if line_idx > 0 { lines[..line_idx].join("\n") } else { String::new() };
-        let suffix = if line_idx < lines.len() { lines[line_idx..].join("\n") } else { String::new() };
-        let instructions = args.get("instructions").and_then(|i| i.as_str()).unwrap_or("");
+        let prefix = if line_idx > 0 {
+            lines[..line_idx].join("\n")
+        } else {
+            String::new()
+        };
+        let suffix = if line_idx < lines.len() {
+            lines[line_idx..].join("\n")
+        } else {
+            String::new()
+        };
+        let instructions = args
+            .get("instructions")
+            .and_then(|i| i.as_str())
+            .unwrap_or("");
 
         // Try AI-based FIM first, fall back to heuristic
         let generated = match ai_fim_completion(&prefix, &suffix, instructions).await {
@@ -78,13 +99,17 @@ impl Tool for FimEditTool {
         match std::fs::write(path, &new_content) {
             Ok(_) => ToolResult::ok(format!(
                 "FIM edit applied at {}:{}\n--- Generated ---\n{}\n---",
-                path, line_idx + 1, generated,
+                path,
+                line_idx + 1,
+                generated,
             )),
             Err(e) => ToolResult::err(format!("Failed to write '{}': {}", path, e)),
         }
     }
 
-    fn requires_permission(&self) -> bool { true }
+    fn requires_permission(&self) -> bool {
+        true
+    }
 }
 
 /// Attempt AI-powered FIM completion using the configured API key.
@@ -113,7 +138,8 @@ async fn ai_fim_completion(prefix: &str, suffix: &str, instructions: &str) -> Op
 
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
-        .build().ok()?;
+        .build()
+        .ok()?;
 
     let body = serde_json::json!({
         "model": model,
@@ -131,22 +157,27 @@ async fn ai_fim_completion(prefix: &str, suffix: &str, instructions: &str) -> Op
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
-        .await.ok()?;
+        .await
+        .ok()?;
 
-    if !resp.status().is_success() { return None; }
+    if !resp.status().is_success() {
+        return None;
+    }
 
     let json: serde_json::Value = resp.json().await.ok()?;
     let text = json["choices"][0]["message"]["content"].as_str()?;
     let text = text.trim();
 
     // Clean up markdown fences if the AI added them
-    let text = text.strip_prefix("```").and_then(|t| {
-        t.split_once('\n').map(|(_, rest)| rest)
-    }).unwrap_or(text);
+    let text = text
+        .strip_prefix("```")
+        .and_then(|t| t.split_once('\n').map(|(_, rest)| rest))
+        .unwrap_or(text);
     let text = text.strip_suffix("```").unwrap_or(text);
-    let text = text.strip_prefix("```rust").and_then(|t| {
-        t.split_once('\n').map(|(_, rest)| rest)
-    }).unwrap_or(text);
+    let text = text
+        .strip_prefix("```rust")
+        .and_then(|t| t.split_once('\n').map(|(_, rest)| rest))
+        .unwrap_or(text);
 
     Some(text.trim().to_string())
 }
@@ -158,7 +189,11 @@ async fn ai_fim_completion(prefix: &str, suffix: &str, instructions: &str) -> Op
 /// and return statements.
 pub fn fim_simple(prefix: &str, suffix: &str, middle: &str, instructions: &str) -> String {
     if !instructions.is_empty() {
-        let placeholder = if middle.is_empty() { "unimplemented!()" } else { middle };
+        let placeholder = if middle.is_empty() {
+            "unimplemented!()"
+        } else {
+            middle
+        };
         return format!("// TODO: {}\n{}", instructions, placeholder);
     }
 
@@ -207,9 +242,13 @@ pub fn fim_simple(prefix: &str, suffix: &str, middle: &str, instructions: &str) 
 mod tests {
     use super::*;
 
-    #[test] fn test_fim_tool_name() { assert_eq!(FimEditTool.name(), "fim_edit"); }
+    #[test]
+    fn test_fim_tool_name() {
+        assert_eq!(FimEditTool.name(), "fim_edit");
+    }
 
-    #[test] fn test_fim_schema() {
+    #[test]
+    fn test_fim_schema() {
         let tool = FimEditTool;
         let schema = tool.schema();
         assert!(schema.get("properties").is_some());
@@ -223,38 +262,58 @@ mod tests {
         assert!(names.contains(&"line"));
     }
 
-    #[tokio::test] async fn test_fim_empty_path() {
-        assert!(!FimEditTool.execute(serde_json::json!({"line": 0})).await.success);
+    #[tokio::test]
+    async fn test_fim_empty_path() {
+        assert!(
+            !FimEditTool
+                .execute(serde_json::json!({"line": 0}))
+                .await
+                .success
+        );
     }
 
-    #[tokio::test] async fn test_fim_negative_line() {
-        assert!(!FimEditTool.execute(serde_json::json!({"path": "f", "line": -1})).await.success);
+    #[tokio::test]
+    async fn test_fim_negative_line() {
+        assert!(
+            !FimEditTool
+                .execute(serde_json::json!({"path": "f", "line": -1}))
+                .await
+                .success
+        );
     }
 
-    #[tokio::test] async fn test_fim_valid() {
+    #[tokio::test]
+    async fn test_fim_valid() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(tmp.path(), "a\nb\nc\n").unwrap();
-        let r = FimEditTool.execute(serde_json::json!({"path": tmp.path(), "line": 1})).await;
+        let r = FimEditTool
+            .execute(serde_json::json!({"path": tmp.path(), "line": 1}))
+            .await;
         assert!(r.success);
     }
 
-    #[test] fn test_fim_simple_function_with_return() {
+    #[test]
+    fn test_fim_simple_function_with_return() {
         let result = fim_simple("fn add(a: i32, b: i32) -> i32 {", "}", "", "");
         assert!(result.contains("unimplemented"));
     }
-    #[test] fn test_fim_simple_void_function() {
+    #[test]
+    fn test_fim_simple_void_function() {
         let result = fim_simple("fn greet() {", "}", "", "");
         assert!(result.contains("TODO"));
     }
-    #[test] fn test_fim_simple_with_instructions() {
+    #[test]
+    fn test_fim_simple_with_instructions() {
         let result = fim_simple("fn calc() -> i32 {", "}", "", "return 42");
         assert!(result.contains("TODO") && result.contains("return 42"));
     }
-    #[test] fn test_fim_simple_variable() {
+    #[test]
+    fn test_fim_simple_variable() {
         let result = fim_simple("let name: String = ", ";", "", "");
         assert_eq!(result, "String::new()");
     }
-    #[test] fn test_fim_simple_fallback() {
+    #[test]
+    fn test_fim_simple_fallback() {
         let result = fim_simple("fn foo(", "}", "", "");
         assert!(result.contains("unimplemented"));
     }

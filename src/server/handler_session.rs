@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
-use axum::response::{IntoResponse, Json};
 use axum::response::Response;
+use axum::response::{IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
@@ -149,9 +149,7 @@ pub async fn chat_stream(
         let provider = state.provider.lock().await;
         let tool_defs = state.tool_registry.tool_defs();
         let config = GenerateConfig::default();
-        provider
-            .chat_stream(&messages, &tool_defs, &config)
-            .await?
+        provider.chat_stream(&messages, &tool_defs, &config).await?
     };
     // Provider lock is released here -- streaming happens without holding it.
 
@@ -171,13 +169,9 @@ pub async fn chat_stream(
                         })
                     }),
                 });
-                Ok(SseEvent::default()
-                    .event("done")
-                    .data(payload.to_string()))
+                Ok(SseEvent::default().event("done").data(payload.to_string()))
             }
-            StreamEvent::Error(e) => {
-                Ok(SseEvent::default().event("error").data(e))
-            }
+            StreamEvent::Error(e) => Ok(SseEvent::default().event("error").data(e)),
             // Tool call events are collected internally by the provider --
             // we skip them in the raw stream for the simple chat API.
             _ => Ok(SseEvent::default().event("skip").data("")),
@@ -206,6 +200,9 @@ mod tests {
                 "gpt-4o".into(),
             )),
         );
-        assert!(state.tool_registry.len() >= 10, "default registry should have at least 10 tools");
+        assert!(
+            state.tool_registry.len() >= 10,
+            "default registry should have at least 10 tools"
+        );
     }
 }

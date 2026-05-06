@@ -54,10 +54,7 @@ impl Skill for BrainstormSkill {
             .min(20)
             .max(1) as usize;
 
-        let context = input
-            .get("context")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let context = input.get("context").and_then(|v| v.as_str()).unwrap_or("");
 
         let mut summary = String::new();
         summary.push_str(&format!("# Brainstorm: {}\n\n", topic));
@@ -68,7 +65,10 @@ impl Skill for BrainstormSkill {
 
         summary.push_str("## Generated Ideas\n\n");
         for i in 1..=count {
-            summary.push_str(&format!("{}. **Idea {}:** Explore an aspect of '{}'\n", i, i, topic));
+            summary.push_str(&format!(
+                "{}. **Idea {}:** Explore an aspect of '{}'\n",
+                i, i, topic
+            ));
             if i % 3 == 1 {
                 summary.push_str("   - What are the fundamental components or first principles?\n");
                 summary.push_str("   - How can existing approaches be simplified?\n");
@@ -122,7 +122,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result["success"], true);
-        assert!(result["output"].as_str().unwrap().contains("Rust project ideas"));
+        assert!(result["output"]
+            .as_str()
+            .unwrap()
+            .contains("Rust project ideas"));
     }
 
     #[tokio::test]

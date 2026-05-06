@@ -55,14 +55,9 @@ impl Skill for CodeReviewSkill {
             .and_then(|v| v.as_str())
             .unwrap_or("unknown");
 
-        let focus = input
-            .get("focus")
-            .and_then(|v| v.as_str())
-            .unwrap_or("all");
+        let focus = input.get("focus").and_then(|v| v.as_str()).unwrap_or("all");
 
-        let _file_path = input
-            .get("file_path")
-            .and_then(|v| v.as_str());
+        let _file_path = input.get("file_path").and_then(|v| v.as_str());
 
         let line_count = code.lines().count();
 
@@ -115,9 +110,7 @@ impl Skill for CodeReviewSkill {
                     "- **File is long (>400 lines)**; consider splitting into smaller modules\n",
                 );
             } else if line_count > 200 {
-                review.push_str(
-                    "- File is moderately long (>200 lines); monitor as it grows\n",
-                );
+                review.push_str("- File is moderately long (>200 lines); monitor as it grows\n");
             }
 
             let blank_lines = code.lines().filter(|l| l.trim().is_empty()).count();
@@ -164,11 +157,15 @@ impl Skill for CodeReviewSkill {
                 );
             }
 
-            let none_reviewed = ["unsafe", "unwrap(", "expect(", "password", "secret", "eval(", "exec("]
-                .iter()
-                .all(|pat| !code.contains(pat));
+            let none_reviewed = [
+                "unsafe", "unwrap(", "expect(", "password", "secret", "eval(", "exec(",
+            ]
+            .iter()
+            .all(|pat| !code.contains(pat));
             if none_reviewed {
-                review.push_str("- No obvious security anti-patterns detected in the provided code\n");
+                review.push_str(
+                    "- No obvious security anti-patterns detected in the provided code\n",
+                );
             }
 
             review.push_str("\n");
@@ -231,7 +228,11 @@ fn get_git_diff() -> Option<String> {
         .ok()?;
     if output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        if stdout.is_empty() { None } else { Some(stdout) }
+        if stdout.is_empty() {
+            None
+        } else {
+            Some(stdout)
+        }
     } else {
         None
     }
@@ -266,10 +267,7 @@ mod tests {
     #[tokio::test]
     async fn test_code_review_defaults() {
         let skill = CodeReviewSkill;
-        let result = skill
-            .execute(json!({ "code": "x = 1" }))
-            .await
-            .unwrap();
+        let result = skill.execute(json!({ "code": "x = 1" })).await.unwrap();
         assert_eq!(result["data"]["focus"], "all");
         assert_eq!(result["data"]["language"], "unknown");
     }

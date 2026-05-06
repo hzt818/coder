@@ -57,8 +57,12 @@ impl TelegramAdapter {
     #[allow(dead_code)]
     async fn get_updates(&self, offset: &mut i64) -> anyhow::Result<Vec<TelegramMessage>> {
         let client = reqwest::Client::new();
-        let url = format!("https://api.telegram.org/bot{}/getUpdates", self.config.bot_token);
-        let resp = client.post(&url)
+        let url = format!(
+            "https://api.telegram.org/bot{}/getUpdates",
+            self.config.bot_token
+        );
+        let resp = client
+            .post(&url)
             .json(&serde_json::json!({
                 "offset": offset,
                 "timeout": 30,
@@ -78,7 +82,8 @@ impl TelegramAdapter {
                     let message_id = msg["message_id"].as_i64().unwrap_or(0);
 
                     if !self.config.allowed_chat_ids.is_empty()
-                        && !self.config.allowed_chat_ids.contains(&chat_id) {
+                        && !self.config.allowed_chat_ids.contains(&chat_id)
+                    {
                         continue;
                     }
 
@@ -111,9 +116,13 @@ impl ImAdapter for TelegramAdapter {
 
     async fn send_message(&self, chat_id: i64, text: &str) -> anyhow::Result<()> {
         let client = reqwest::Client::new();
-        let url = format!("https://api.telegram.org/bot{}/sendMessage", self.config.bot_token);
+        let url = format!(
+            "https://api.telegram.org/bot{}/sendMessage",
+            self.config.bot_token
+        );
         let truncated = &text[..text.len().min(self.config.max_message_length)];
-        client.post(&url)
+        client
+            .post(&url)
             .json(&serde_json::json!({
                 "chat_id": chat_id,
                 "text": truncated,

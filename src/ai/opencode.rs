@@ -5,10 +5,10 @@
 //! - Anonymous (no API key): IP-based rate limiting, limited model set
 //! - Authenticated (with API key): workspace-based access, full model set
 
+use super::provider::{Provider, StreamHandler};
+use super::*;
 use async_trait::async_trait;
 use serde::Deserialize;
-use super::*;
-use super::provider::{Provider, StreamHandler};
 
 /// Response from GET /zen/v1/models
 #[derive(Debug, Deserialize)]
@@ -44,7 +44,12 @@ impl OpenCodeProvider {
             .unwrap_or_else(|| "https://opencode.ai/zen/v1".to_string())
             .trim_end_matches('/')
             .to_string();
-        Self { api_key, base_url, model, available_models: Vec::new() }
+        Self {
+            api_key,
+            base_url,
+            model,
+            available_models: Vec::new(),
+        }
     }
 
     pub async fn fetch_models(&self) -> anyhow::Result<Vec<String>> {
@@ -75,7 +80,12 @@ impl OpenCodeProvider {
         self.api_key.is_none()
     }
 
-    fn build_request(&self, messages: &[Message], tools: &[ToolDef], config: &GenerateConfig) -> serde_json::Value {
+    fn build_request(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDef],
+        config: &GenerateConfig,
+    ) -> serde_json::Value {
         let mut body = serde_json::json!({
             "model": self.model,
             "messages": messages_to_openai(messages),
@@ -84,16 +94,19 @@ impl OpenCodeProvider {
             "stream": true,
         });
         if !tools.is_empty() {
-            body["tools"] = serde_json::json!(tools.iter().map(|t| {
-                serde_json::json!({
-                    "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.input_schema,
-                    }
+            body["tools"] = serde_json::json!(tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.input_schema,
+                        }
+                    })
                 })
-            }).collect::<Vec<_>>());
+                .collect::<Vec<_>>());
         }
         body
     }
@@ -101,8 +114,12 @@ impl OpenCodeProvider {
 
 #[async_trait]
 impl Provider for OpenCodeProvider {
-    fn name(&self) -> &str { "OpenCode" }
-    fn model(&self) -> &str { &self.model }
+    fn name(&self) -> &str {
+        "OpenCode"
+    }
+    fn model(&self) -> &str {
+        &self.model
+    }
 
     async fn chat_stream(
         &self,
@@ -125,11 +142,22 @@ impl Provider for OpenCodeProvider {
             let status = response.status().as_u16();
             let body = response.text().await.unwrap_or_default();
             let msg = match status {
-                429 => format!("OpenCode API rate limit exceeded. {}", if self.is_anonymous() {
-                    "Try again later or get a free API key at https://opencode.ai/zen"
-                } else { "Try again later." }),
-                401 | 403 => "Invalid or expired API key. Check your key at https://opencode.ai/zen".to_string(),
-                404 => format!("Model '{}' not available via OpenCode. Run /model to see available models.", self.model),
+                429 => format!(
+                    "OpenCode API rate limit exceeded. {}",
+                    if self.is_anonymous() {
+                        "Try again later or get a free API key at https://opencode.ai/zen"
+                    } else {
+                        "Try again later."
+                    }
+                ),
+                401 | 403 => {
+                    "Invalid or expired API key. Check your key at https://opencode.ai/zen"
+                        .to_string()
+                }
+                404 => format!(
+                    "Model '{}' not available via OpenCode. Run /model to see available models.",
+                    self.model
+                ),
                 _ => format!("OpenCode API error ({}): {}", status, body),
             };
             anyhow::bail!("{}", msg);
@@ -162,14 +190,22 @@ mod tests {
 
     #[test]
     fn test_new_with_custom_url() {
-        let p = OpenCodeProvider::new(Some("opk_test".to_string()), Some("https://custom.zen.url/v1".to_string()), "gpt-4o".to_string());
+        let p = OpenCodeProvider::new(
+            Some("opk_test".to_string()),
+            Some("https://custom.zen.url/v1".to_string()),
+            "gpt-4o".to_string(),
+        );
         assert_eq!(p.base_url, "https://custom.zen.url/v1");
         assert!(!p.is_anonymous());
     }
 
     #[test]
     fn test_new_trims_trailing_slash() {
-        let p = OpenCodeProvider::new(None, Some("https://opencode.ai/zen/v1/".to_string()), "m".to_string());
+        let p = OpenCodeProvider::new(
+            None,
+            Some("https://opencode.ai/zen/v1/".to_string()),
+            "m".to_string(),
+        );
         assert_eq!(p.base_url, "https://opencode.ai/zen/v1");
     }
 
@@ -188,7 +224,8 @@ mod tests {
         let p = OpenCodeProvider::new(None, None, "m".to_string());
         let msgs = vec![Message::user("list files")];
         let tools = vec![ToolDef {
-            name: "bash".to_string(), description: "Run shell".to_string(),
+            name: "bash".to_string(),
+            description: "Run shell".to_string(),
             input_schema: serde_json::json!({"type": "object"}),
         }];
         let config = GenerateConfig::default();
