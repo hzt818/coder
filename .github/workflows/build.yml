@@ -23,20 +23,16 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
-# ---------------------------------------------------------------------------
-# Concurrency: cancel in-progress runs for the same branch (except on tags)
-# ---------------------------------------------------------------------------
+# Cancel in-progress runs for the same branch (except on tags)
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  # -----------------------------------------------------------------------
-  # 1. Lint & Format Check
-  # -----------------------------------------------------------------------
+  # ===== 1. Format & Lint =====
   lint:
     name: Lint
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -46,23 +42,17 @@ jobs:
           rustup toolchain install stable --profile minimal --no-self-update
           rustup component add clippy rustfmt
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
-      - name: cargo fmt
-        run: cargo fmt --all --check
+      - run: cargo fmt --all --check
+      - run: cargo clippy --all-targets -- -D warnings
 
-      - name: cargo clippy
-        run: cargo clippy --all-targets -- -D warnings
-
-  # -----------------------------------------------------------------------
-  # 2. Test (on Ubuntu)
-  # -----------------------------------------------------------------------
+  # ===== 2. Test =====
   test:
     name: Test
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -70,28 +60,17 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal --no-self-update
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
-      - name: Install system deps
+      - name: Install system dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev pkg-config
 
-      - name: cargo test (default features)
-        run: cargo test
+      - run: cargo test
+      - run: cargo test --no-default-features --features ai-openai
 
-      - name: cargo test (all features)
-        run: cargo test --features "$ALL_FEATURES"
-        env:
-          ALL_FEATURES: ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,computer,worktree
-
-      - name: cargo test (no-default-features)
-        run: cargo test --no-default-features --features ai-openai
-
-  # -----------------------------------------------------------------------
-  # 3. Build Matrix — all platforms
-  # -----------------------------------------------------------------------
+  # ===== 3. Build Matrix — all platforms =====
   build:
     name: Build (${{ matrix.target }})
     needs: [lint, test]
@@ -100,29 +79,24 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-24.04
+            os: ubuntu-latest
             artifact_name: coder-linux-x86_64
-            cross: false
 
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-24.04
+            os: ubuntu-latest
             artifact_name: coder-linux-aarch64
-            cross: true
 
           - target: x86_64-apple-darwin
-            os: macos-14
+            os: macos-13
             artifact_name: coder-macos-x86_64
-            cross: false
 
           - target: aarch64-apple-darwin
-            os: macos-14
+            os: macos-latest
             artifact_name: coder-macos-aarch64
-            cross: false
 
           - target: x86_64-pc-windows-msvc
-            os: windows-2025
+            os: windows-latest
             artifact_name: coder-windows-x86_64.exe
-            cross: false
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -134,49 +108,62 @@ jobs:
           rustup toolchain install stable --profile minimal --no-self-update
           rustup target add ${{ matrix.target }}
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           key: ${{ matrix.target }}
 
+      # Linux aarch64 cross-compilation dependencies
       - name: Install cross-compilation tools (Linux aarch64)
-        if: matrix.cross
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq gcc-aarch64-linux-gnu libasound2-dev:arm64
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo dpkg --add-architecture arm64
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            gcc-aarch64-linux-gnu \
+            libasound2-dev:arm64 \
+            pkg-config-aarch64-linux-gnu || true
 
       - name: cargo build --release
         run: cargo build --release --target ${{ matrix.target }} --all-features
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           PKG_CONFIG_ALLOW_CROSS: 1
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig
 
-      - name: Strip binary
-        if: runner.os != 'Windows'
-        run: strip target/${{ matrix.target }}/release/coder
+      - name: Strip binary (Linux)
+        if: startsWith(matrix.target, 'x86_64-unknown-linux') || matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          if command -v aarch64-linux-gnu-strip &>/dev/null; then
+            aarch64-linux-gnu-strip target/${{ matrix.target }}/release/coder
+          else
+            strip target/${{ matrix.target }}/release/coder
+          fi
+
+      - name: Strip binary (macOS)
+        if: startsWith(matrix.target, 'aarch64-apple-darwin') || matrix.target == 'x86_64-apple-darwin'
+        run: strip -d target/${{ matrix.target }}/release/coder 2>/dev/null || true
 
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: target/${{ matrix.target }}/release/coder${{ runner.os == 'Windows' && '.exe' || '' }}
+          path: |
+            target/${{ matrix.target }}/release/coder
+            target/${{ matrix.target }}/release/coder.exe
           compression-level: 0
           if-no-files-found: error
 
-  # -----------------------------------------------------------------------
-  # 4. npm Package — prepare & publish
-  # -----------------------------------------------------------------------
+  # ===== 4. npm Package =====
   npm:
     name: npm Package
-    # Run on:
-    #   - pushes to master (validate package.json)
-    #   - version tags (publish or dry-run)
-    #   - workflow_dispatch with publish_npm=true
     if: >
       github.ref == 'refs/heads/master'
       || startsWith(github.ref, 'refs/tags/v')
       || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
     needs: [build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -194,16 +181,19 @@ jobs:
 
       - name: Prepare npm package
         run: |
-          # Create the npm package directory structure
+          set -e
           mkdir -p npm-package/bin
 
-          # Copy platform binaries
           PLATFORMS="linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64 windows-x86_64"
           for plat in $PLATFORMS; do
-            src="${{ github.workspace }}/artifacts/coder-${plat}"
-            if [ -f "$src" ] || [ -f "${src}.exe" ]; then
+            dir="${{ github.workspace }}/artifacts/coder-${plat}"
+            if [ -d "$dir" ]; then
               mkdir -p "npm-package/bin/${plat}"
-              cp "${src}"* "npm-package/bin/${plat}/"
+              # Copy whichever binary file exists (coder or coder.exe)
+              find "$dir" -maxdepth 1 -type f -exec cp {} "npm-package/bin/${plat}/" \;
+              echo "Copied artifacts for ${plat}"
+            else
+              echo "Warning: no artifacts found for ${plat}"
             fi
           done
 
@@ -211,7 +201,6 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           VERSION="${VERSION:-0.1.0}"
-          echo "PKG_VERSION=${VERSION}" >> "${GITHUB_ENV}"
 
           cat > npm-package/package.json << PKGJSON
           {
@@ -235,18 +224,13 @@ jobs:
           }
           PKGJSON
 
-      - name: Write install script
+      - name: Write install.js
         run: |
           cat > npm-package/install.js << 'INSTALLJS'
           #!/usr/bin/env node
-          /**
-           * Coder — platform-aware binary installer
-           *
-           * Detects the current platform/architecture and runs the correct
-           * compiled binary, downloaded at npm install time.
-           */
           const { spawnSync } = require("child_process");
           const path = require("path");
+          const fs = require("fs");
 
           const platformMap = {
             linux: { x64: "linux-x86_64", arm64: "linux-aarch64" },
@@ -266,8 +250,19 @@ jobs:
             process.exit(1);
           }
 
-          const ext = process.platform === "win32" ? ".exe" : "";
-          const binPath = path.join(__dirname, "bin", arch, "coder" + ext);
+          const binDir = path.join(__dirname, "bin", arch);
+          let binPath = path.join(binDir, "coder");
+
+          // Windows uses .exe
+          if (process.platform === "win32") {
+            binPath += ".exe";
+          }
+
+          if (!fs.existsSync(binPath)) {
+            console.error("Binary not found for", process.platform, process.arch);
+            console.error("Looked at:", binPath);
+            process.exit(1);
+          }
 
           const result = spawnSync(binPath, process.argv.slice(2), {
             stdio: "inherit",
@@ -275,8 +270,7 @@ jobs:
 
           process.exit(result.status ?? 1);
           INSTALLJS
-
-          chmod +x "${{ github.workspace }}/npm-package/install.js"
+          chmod +x npm-package/install.js
 
       - name: Write README
         run: |
@@ -299,7 +293,6 @@ jobs:
           ```
           README
 
-      # Publish to npm (or dry-run)
       - name: Publish to npm
         if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm
         run: |
@@ -314,14 +307,12 @@ jobs:
           cd npm-package
           npm publish --dry-run
 
-  # -----------------------------------------------------------------------
-  # 5. GitHub Release (only on version tags)
-  # -----------------------------------------------------------------------
+  # ===== 5. GitHub Release (tags only) =====
   release:
     name: Release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -336,43 +327,13 @@ jobs:
           mkdir -p release-assets
           for dir in artifacts/*/; do
             base=$(basename "$dir")
-            cp -r "$dir"/* "release-assets/${base}"
+            find "$dir" -maxdepth 1 -type f -exec cp {} "release-assets/${base}" \;
           done
           ls -la release-assets/
-
-      - name: Generate release notes
-        run: |
-          cat > release-notes.md << 'EOF'
-          ## Coder ${{ github.ref_name }}
-
-          ### Installation
-
-          ```bash
-          # Via npm (recommended)
-          npm install -g coder
-
-          # Or download the binary for your platform from the assets below.
-          ```
-
-          ### Platform Support
-
-          | Asset | Platform |
-          |-------|----------|
-          | \`coder-linux-x86_64\` | Linux x86_64 |
-          | \`coder-linux-aarch64\` | Linux ARM64 |
-          | \`coder-macos-x86_64\` | macOS Intel |
-          | \`coder-macos-aarch64\` | macOS Apple Silicon |
-          | \`coder-windows-x86_64.exe\` | Windows x86_64 |
-
-          ### Changelog
-
-          See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) for details.
-          EOF
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: Coder ${{ github.ref_name }}
-          body_path: release-notes.md
           files: release-assets/*
-          generate_release_notes: false
+          generate_release_notes: true
