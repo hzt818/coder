@@ -54,6 +54,7 @@ impl TelegramAdapter {
     }
 
     /// Get updates from Telegram Bot API.
+    #[allow(dead_code)]
     async fn get_updates(&self, offset: &mut i64) -> anyhow::Result<Vec<TelegramMessage>> {
         let client = reqwest::Client::new();
         let url = format!("https://api.telegram.org/bot{}/getUpdates", self.config.bot_token);

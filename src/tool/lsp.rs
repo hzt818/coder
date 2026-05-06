@@ -27,6 +27,7 @@ fn global_lsp_handler() -> Option<&'static crate::lsp::handler::LspHandler> {
 }
 
 /// Map a file extension to a language ID and LSP server command.
+#[cfg(any(feature = "lsp", test))]
 fn language_for_extension(path: &str) -> Option<(&'static str, &'static str, Vec<&'static str>)> {
     let ext = std::path::Path::new(path)
         .extension()
@@ -47,6 +48,7 @@ fn language_for_extension(path: &str) -> Option<(&'static str, &'static str, Vec
 }
 
 /// Format an LSP location (URI + range) into a human-readable string.
+#[cfg(any(feature = "lsp", test))]
 fn format_location(uri: &str, range: &serde_json::Value) -> String {
     let start = range.get("start").or_else(|| range.as_object().map(|_| range));
     if let Some(start) = start {

@@ -8,16 +8,16 @@ use super::*;
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use tokio::sync::RwLock;
 
 struct MonitoredProcess {
-    id: String,
-    command: String,
+    _id: String,
+    _command: String,
     started_at: Instant,
     output: Vec<String>,
     running: bool,
-    filter: Option<String>,
+    _filter: Option<String>,
 }
 
 pub struct MonitorManager {
@@ -58,12 +58,12 @@ impl MonitorManager {
         });
 
         let process = MonitoredProcess {
-            id: id.clone(),
-            command: command.to_string(),
+            _id: id.clone(),
+            _command: command.to_string(),
             started_at: Instant::now(),
             output: Vec::new(),
             running: true,
-            filter: filter_str,
+            _filter: filter_str,
         };
 
         self.processes.write().await.insert(id.clone(), process);

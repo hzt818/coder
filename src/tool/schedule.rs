@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 use super::*;
-use crate::core::automation::{self, AutomationStatus};
+use crate::core::automation;
 
 pub struct CronCreate;
 pub struct CronUpdate;

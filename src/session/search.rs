@@ -3,8 +3,6 @@
 //! Provides `thinkback` functionality to search past sessions
 //! by content keywords using basic fuzzy matching.
 
-use std::path::Path;
-
 /// Search session content for a query string.
 pub fn search_sessions(query: &str, max_results: usize) -> Vec<SessionSearchResult> {
     let session_dir = crate::util::path::coder_dir().join("sessions");

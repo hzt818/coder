@@ -29,26 +29,22 @@ impl Tool for PushNotificationTool {
         let message = args.get("message").and_then(|m| m.as_str()).unwrap_or("");
         if message.is_empty() { return ToolResult::err("Message is required"); }
 
-        let mut sent = false;
-
-        #[cfg(target_os = "macos")]
-        {
+        let sent = if cfg!(target_os = "macos") {
             let _ = Command::new("osascript")
                 .args(["-e", &format!("display notification \"{}\" with title \"{}\"",
                     message.replace('"', "\\\""), title.replace('"', "\\\""))])
                 .output();
-            sent = true;
-        }
-
-        #[cfg(target_os = "windows")]
-        {
+            true
+        } else if cfg!(target_os = "windows") {
             // PowerShell toast notification
             let _ = Command::new("powershell")
                 .args(["-Command",
                     &format!("New-BurntToastNotification -Text \"{}\", \"{}\"", title, message)])
                 .output();
-            sent = true;
-        }
+            true
+        } else {
+            false
+        };
 
         // Fallback: terminal bell
         if !sent {

@@ -24,14 +24,14 @@ impl Tool for RecallTool {
         serde_json::json!({
             "type": "object", "properties": {
                 "query": { "type": "string", "description": "Search query" },
-                "max_results": { "type": "integer", "description": "Max results (1-10)", "default": 3 }
+                "max_results": { "type": "integer", "description": "Max results (1-10)", "default": DEFAULT_MAX_RESULTS }
             }, "required": ["query"]
         })
     }
     async fn execute(&self, args: serde_json::Value) -> ToolResult {
         let query = args.get("query").and_then(|q| q.as_str()).unwrap_or("").trim().to_string();
         if query.is_empty() { return ToolResult::err("Query is required"); }
-        let max_results = args.get("max_results").and_then(|m| m.as_u64()).unwrap_or(3).clamp(1, HARD_MAX_RESULTS as u64) as usize;
+        let max_results = args.get("max_results").and_then(|m| m.as_u64()).unwrap_or(DEFAULT_MAX_RESULTS as u64).clamp(1, HARD_MAX_RESULTS as u64) as usize;
 
         // Try to load recent session files and search their content
         let session_dir = crate::util::path::coder_dir().join("sessions");

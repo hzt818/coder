@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use super::*;
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufReader, Read, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -20,44 +20,15 @@ pub enum ShellStatus { Running, Completed, Failed, Killed, TimedOut }
 /// A tracked background shell job.
 #[derive(Debug)]
 struct BackgroundJob {
-    id: String,
-    command: String,
     child: Option<Child>,
     stdin: Option<ChildStdin>,
     stdout_buf: Arc<Mutex<Vec<u8>>>,
     stderr_buf: Arc<Mutex<Vec<u8>>>,
     status: ShellStatus,
     exit_code: Option<i32>,
-    started_at: Instant,
-    stdout_len: usize,
-    stderr_len: usize,
 }
 
 impl BackgroundJob {
-    fn new(id: String, command: &str, child: Child, stdin: ChildStdin) -> Self {
-        let stdout_buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
-        let stderr_buf: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::new()));
-
-        // Spawn reader threads for stdout/stderr
-        let stdout_reader = child.stdout.as_ref().map(|s| {
-            // We need to duplicate the handle... actually let's use the take approach
-        });
-
-        Self {
-            id,
-            command: command.to_string(),
-            child: Some(child),
-            stdin: Some(stdin),
-            stdout_buf,
-            stderr_buf,
-            status: ShellStatus::Running,
-            exit_code: None,
-            started_at: Instant::now(),
-            stdout_len: 0,
-            stderr_len: 0,
-        }
-    }
-
     fn try_update_status(&mut self) {
         if let Some(ref mut child) = self.child {
             match child.try_wait() {
@@ -148,17 +119,12 @@ impl BackgroundShellManager {
         });
 
         let job = BackgroundJob {
-            id: id.clone(),
-            command: command.to_string(),
             child: Some(child),
             stdin: Some(stdin),
             stdout_buf,
             stderr_buf,
             status: ShellStatus::Running,
             exit_code: None,
-            started_at: Instant::now(),
-            stdout_len: 0,
-            stderr_len: 0,
         };
 
         self.jobs.write().await.insert(id.clone(), job);

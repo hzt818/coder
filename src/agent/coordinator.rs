@@ -3,8 +3,6 @@
 //! The coordinator agent decomposes a task into phases and delegates
 //! work to sub-agents. Phases: Research → Synthesis → Implementation → Verification.
 
-use super::types::AgentType;
-
 /// Get the coordinator system prompt for multi-agent orchestration.
 pub fn get_coordinator_prompt() -> &'static str {
     "You are a coordinator agent. Your job is to break down complex tasks and delegate them.\n\
