@@ -338,6 +338,17 @@ model = "gpt-4o"
             ),
         ];
         for (provider_type, base_url, model) in providers {
+            // Skip providers whose features aren't enabled (e.g. opencode
+            // without ai-opencode, google without ai-google).
+            let enabled = match provider_type {
+                "opencode" => cfg!(feature = "ai-opencode"),
+                "google" => cfg!(feature = "ai-google"),
+                _ => true,
+            };
+            if !enabled {
+                continue;
+            }
+
             let config = coder::config::ProviderConfig {
                 provider_type: provider_type.to_string(),
                 api_key: Some("test-key".to_string()),

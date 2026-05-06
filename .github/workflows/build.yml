@@ -118,6 +118,11 @@ jobs:
           cache-on-failure: true
           key: ${{ matrix.target }}-v1
 
+      # Linux system dependencies (for --all-features build: voice → cpal → alsa/dbus)
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev libdbus-1-dev pkg-config
+
       # Linux aarch64 cross-compilation dependencies
       - name: Install cross-compilation tools (Linux aarch64)
         if: matrix.target == 'aarch64-unknown-linux-gnu'
