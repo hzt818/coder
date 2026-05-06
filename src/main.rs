@@ -243,9 +243,7 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
                 println!("Session not found: {session_id}");
             }
             Err(e) => {
-                eprintln!(
-                    "Failed to load session '{session_id}': {e}. Starting new session."
-                );
+                eprintln!("Failed to load session '{session_id}': {e}. Starting new session.");
             }
         }
     }
@@ -266,7 +264,8 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
                 .and_then(|p| p.model.clone())
         })
         .unwrap_or_else(|| "unknown".to_string());
-    let working_dir = std::fs::canonicalize(&cli.directory).map_or_else(|_| cli.directory.clone(), |p| p.display().to_string());
+    let working_dir = std::fs::canonicalize(&cli.directory)
+        .map_or_else(|_| cli.directory.clone(), |p| p.display().to_string());
 
     let mut terminal = coder::tui::init_terminal()?;
     let mut app = coder::tui::App::new(agent, model_name, provider_name, working_dir);
