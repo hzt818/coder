@@ -99,21 +99,18 @@ impl Tool for LspTool {
             return self.execute_real(op, &args).await;
         }
 
-        // Fallback
+        // Fallback — when the `lsp` feature is not compiled in.
         #[cfg(not(feature = "lsp"))]
         {
-            ToolResult::ok(match op {
+            match op {
                 "go_to_definition" | "find_references" | "hover" => {
                     let file = args.get("file_path").and_then(|f| f.as_str()).unwrap_or("");
                     let line = args.get("line").and_then(|l| l.as_i64()).unwrap_or(0);
                     let col = args.get("column").and_then(|c| c.as_i64()).unwrap_or(0);
-                    format!("LSP '{}' for {}:{}:{} requires the 'lsp' feature.\nBuild with: cargo build --features lsp\nFor now, try: grep -rn 'symbol_name' src/", op, file, line, col)
+                    ToolResult::ok(format!("LSP '{}' for {}:{}:{} requires the 'lsp' feature.\nBuild with: cargo build --features lsp\nFor now, try: grep -rn 'symbol_name' src/", op, file, line, col))
                 }
-                _ => format!(
-                    "LSP '{}' requires the 'lsp' feature.\nBuild with: cargo build --features lsp",
-                    op
-                ),
-            })
+                _ => ToolResult::err(format!("Unknown LSP operation: '{}'. Supported operations: go_to_definition, find_references, hover, document_symbols, workspace_symbols, call_hierarchy", op)),
+            }
         }
     }
     fn requires_permission(&self) -> bool {
