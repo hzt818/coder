@@ -145,7 +145,7 @@ impl LspTool {
 
                 let configs = crate::lsp::handler::default_lsp_configs();
                 let (cmd, args_list) = match configs.get(lang) {
-                    Some(c) => *c,
+                    Some(c) => c.clone(),
                     None => {
                         return ToolResult::err(format!("No LSP server configured for '{}'", lang))
                     }
