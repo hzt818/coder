@@ -60,12 +60,17 @@ jobs:
       - name: Install Rust toolchain
         run: rustup toolchain install stable --profile minimal --no-self-update
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libasound2-dev pkg-config libdbus-1-dev
+          # Verify dbus-1.pc is findable
+          pkg-config --exists dbus-1 && echo "dbus-1 OK" || echo "dbus-1 MISSING"
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-
-      - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev pkg-config libdbus-1-dev
+          key: test-v1
 
       - run: cargo test
       - run: cargo test --no-default-features --features ai-openai
@@ -111,7 +116,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          key: ${{ matrix.target }}
+          key: ${{ matrix.target }}-v1
 
       # Linux aarch64 cross-compilation dependencies
       - name: Install cross-compilation tools (Linux aarch64)
