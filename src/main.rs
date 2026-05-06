@@ -9,7 +9,7 @@ use coder::SHUTDOWN_REQUESTED;
 
 /// 🦀 Coder - AI-powered development tool
 ///
-/// Integrates features from Claude Code and OpenCode.
+/// Integrates features from Claude Code and `OpenCode`.
 /// Chat with AI, execute tools, manage teams, and more.
 #[derive(Parser, Debug)]
 #[command(name = "coder", version, about, long_about = None)]
@@ -72,7 +72,7 @@ async fn main() -> anyhow::Result<()> {
     // Initialize logging
     let log_level = if cli.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
-        .with_env_filter(format!("coder={}", log_level))
+        .with_env_filter(format!("coder={log_level}"))
         .init();
 
     // Initialize core systems
@@ -107,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Handle --print mode (one-shot)
     if let Some(ref query) = cli.print {
-        return run_print_mode(&config, &query, &cli).await;
+        return run_print_mode(&config, query, &cli).await;
     }
 
     // Handle headless mode
@@ -165,7 +165,7 @@ async fn run_print_mode(
     let tools = coder::tool::ToolRegistry::default();
     let agent = coder::agent::Agent::new(provider, tools);
     let response = agent.run_simple(query).await?;
-    println!("{}", response);
+    println!("{response}");
     Ok(())
 }
 
@@ -202,7 +202,7 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
                             anyhow::bail!("OAuth cancelled.");
                         }
                         coder::oauth::opencode::OAuthResult::Error(e) => {
-                            anyhow::bail!("OAuth failed: {}", e);
+                            anyhow::bail!("OAuth failed: {e}");
                         }
                     }
                 }
@@ -240,12 +240,11 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
                 );
             }
             Ok(None) => {
-                println!("Session not found: {}", session_id);
+                println!("Session not found: {session_id}");
             }
             Err(e) => {
                 eprintln!(
-                    "Failed to load session '{}': {}. Starting new session.",
-                    session_id, e
+                    "Failed to load session '{session_id}': {e}. Starting new session."
                 );
             }
         }
@@ -267,9 +266,7 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
                 .and_then(|p| p.model.clone())
         })
         .unwrap_or_else(|| "unknown".to_string());
-    let working_dir = std::fs::canonicalize(&cli.directory)
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| cli.directory.clone());
+    let working_dir = std::fs::canonicalize(&cli.directory).map_or_else(|_| cli.directory.clone(), |p| p.display().to_string());
 
     let mut terminal = coder::tui::init_terminal()?;
     let mut app = coder::tui::App::new(agent, model_name, provider_name, working_dir);
@@ -306,7 +303,7 @@ fn create_provider(
     coder::ai::create_provider(&provider_name, provider_config, model_override)
 }
 
-/// Save OpenCode API key to config file and reload settings.
+/// Save `OpenCode` API key to config file and reload settings.
 fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyhow::Result<()> {
     let config_path = coder::util::path::coder_dir().join("config.toml");
 
@@ -361,9 +358,9 @@ fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyh
     }
 
     let serialized = toml::to_string_pretty(&root)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to serialize config: {e}"))?;
     std::fs::write(&config_path, serialized)
-        .map_err(|e| anyhow::anyhow!("Failed to write config: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to write config: {e}"))?;
     tracing::info!("OpenCode config saved to {:?}", config_path);
 
     *config = coder::config::Settings::load(Some(config_path.to_str().unwrap()))?;
