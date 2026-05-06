@@ -211,7 +211,7 @@ mod tests {
             &config,
         );
         // Will be truncated due to byte limit
-        assert!(result.truncated || !result.truncated);
+        assert!(result.truncated);
     }
 
     #[test]

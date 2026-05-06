@@ -230,11 +230,9 @@ mod tests {
 
     #[test]
     fn test_has_checkpoint_none() {
-        // Should not panic and return false for non-existent checkpoint
-        let result = has_checkpoint();
-        // Note: this may return true if a checkpoint already exists from real usage
-        // The directory path is in ~/.coder/checkpoints/
-        assert!(!result || result);
+        // Should not panic — return value depends on whether a checkpoint
+        // already exists from real usage (~/.coder/checkpoints/).
+        let _result = has_checkpoint();
     }
 
     #[test]
