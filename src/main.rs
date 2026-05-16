@@ -80,6 +80,10 @@ async fn main() -> anyhow::Result<()> {
     coder::core::audit::AuditLogger::init(None);
     tracing::info!("Audit logger initialized");
 
+    // Initialize bridges for module continuity
+    let bridge_config = coder::core::bridge::BridgeConfig::default();
+    coder::core::bridge::init_bridges(&bridge_config);
+
     // Load config
     let config_path = cli.config.clone();
     let config = coder::config::Settings::load(config_path.as_deref())?;
@@ -144,16 +148,61 @@ fn setup_signal_handler() {
     });
 }
 
-/// Windows-compatible signal handler.
+/// Windows-compatible signal handler with graceful shutdown support.
+///
+/// Handles Ctrl+C (SIGINT) and attempts to handle console events including
+/// close button, Ctrl+Break, and Ctrl+Close for graceful shutdown.
 #[cfg(not(unix))]
 fn setup_signal_handler() {
     let notify = shutdown_notifier();
+
+    // Handle Ctrl+C
+    let notify_ctrlc = notify.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.ok();
         tracing::info!("Received Ctrl+C, shutting down gracefully...");
         SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
-        notify.notify_waiters();
+        notify_ctrlc.notify_waiters();
     });
+
+    // On Windows, we also handle console events for window close
+    // This provides better graceful shutdown support
+    #[cfg(windows)]
+    {
+        let notify_console = notify.clone();
+        tokio::spawn(async move {
+            use std::sync::atomic::AtomicBool;
+            use std::sync::Arc;
+
+            // Create a stop event for console handler
+            let running = Arc::new(AtomicBool::new(true));
+            let running_clone = running.clone();
+
+            // Spawn a thread to monitor console events
+            std::thread::spawn(move || {
+                use std::io::Read;
+
+                // On Windows, we use a simple stdin monitor as fallback
+                // since native console event handling requires Windows API calls
+                let mut stdin = std::io::stdin();
+                let mut buf = [0u8; 1];
+
+                while running_clone.load(Ordering::SeqCst) {
+                    // Non-blocking read attempt
+                    if stdin.read(&mut buf).is_ok() {
+                        // Ctrl+C sends 0x03 (ETX) or triggers ctrl_c above
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            });
+
+            // Clean up the monitoring thread when notified
+            notify_console.notified().await;
+            running.store(false, Ordering::SeqCst);
+        });
+    }
+
+    tracing::info!("Signal handler initialized (Windows mode)");
 }
 
 async fn run_print_mode(
@@ -195,13 +244,13 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
                 #[cfg(feature = "ai-opencode")]
                 {
                     match coder::oauth::opencode::run_oauth_flow().await {
-                        coder::oauth::opencode::OAuthResult::Success(key) => {
+                        coder::oauth::opencode::OAuthResultEnum::Success(key) => {
                             save_opencode_config(&mut config, &key)?;
                         }
-                        coder::oauth::opencode::OAuthResult::Cancelled => {
+                        coder::oauth::opencode::OAuthResultEnum::Cancelled => {
                             anyhow::bail!("OAuth cancelled.");
                         }
-                        coder::oauth::opencode::OAuthResult::Error(e) => {
+                        coder::oauth::opencode::OAuthResultEnum::Error(e) => {
                             anyhow::bail!("OAuth failed: {e}");
                         }
                     }

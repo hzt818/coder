@@ -6,7 +6,14 @@ use serde_json::json;
 use super::{Skill, SkillOutput};
 
 /// Skill for systematically debugging issues
+#[derive(Default)]
 pub struct DebugSkill;
+
+impl DebugSkill {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 /// A diagnostic hypothesis with a suggested test approach
 struct Hypothesis {

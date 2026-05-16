@@ -89,6 +89,15 @@ futures = "0.3"
 futures-util = "0.3"
 tokio-stream = "0.1"
 
+# Security / Encryption
+aes-gcm = "0.10"
+rand = "0.8"
+zeroize = { version = "1", features = ["zeroize_derive"] }
+argon2 = "0.5"
+regex = "1"
+sha2 = "0.10"
+base64 = "0.22"
+
 # Errors / Validation
 url = "2"
 
@@ -119,6 +128,7 @@ tools-oauth = []
 tools-db = []
 analytics = []
 permission = []
+security = []
 computer = []
 worktree = []
 

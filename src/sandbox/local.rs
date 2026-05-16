@@ -109,8 +109,16 @@ mod tests {
     #[tokio::test]
     async fn test_local_sandbox_timeout() {
         let sandbox = LocalSandbox::new();
-        let result = sandbox.execute("sleep 10", ".", 1).await;
-        assert!(result.timed_out);
+        // Use a subprocess that hangs for longer than the timeout.
+        // On Windows, `ping -n 10 127.0.0.1 >nul` blocks ~9 seconds;
+        // on Unix, `sleep 10` blocks 10 seconds.
+        let cmd = if cfg!(target_os = "windows") {
+            "ping -n 10 127.0.0.1 >nul"
+        } else {
+            "sleep 10"
+        };
+        let result = sandbox.execute(cmd, ".", 1).await;
+        assert!(result.timed_out, "expected timeout, got exit_code={}", result.exit_code);
         assert!(result.stderr.contains("timed out"));
     }
 }

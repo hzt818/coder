@@ -6,7 +6,14 @@ use serde_json::json;
 use super::{Skill, SkillOutput};
 
 /// Skill for creating structured implementation plans
+#[derive(Default)]
 pub struct PlanSkill;
+
+impl PlanSkill {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl Skill for PlanSkill {

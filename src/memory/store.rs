@@ -20,6 +20,7 @@ pub struct MemoryEntry {
 ///
 /// Memories are stored as individual JSON files in a memory directory,
 /// enabling simple inspection and manual editing.
+#[derive(Clone)]
 pub struct MemoryStore {
     memory_dir: std::path::PathBuf,
 }

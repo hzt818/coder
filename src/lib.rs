@@ -36,6 +36,8 @@ pub mod team;
 // Phase 2
 #[cfg(feature = "analytics")]
 pub mod analytics;
+#[cfg(feature = "security")]
+pub mod security;
 #[cfg(feature = "computer")]
 pub mod computer;
 #[cfg(feature = "oauth")]

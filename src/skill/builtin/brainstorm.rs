@@ -6,7 +6,14 @@ use serde_json::json;
 use super::{Skill, SkillOutput};
 
 /// Skill for generating creative ideas on a topic
+#[derive(Default)]
 pub struct BrainstormSkill;
+
+impl BrainstormSkill {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 #[async_trait]
 impl Skill for BrainstormSkill {
