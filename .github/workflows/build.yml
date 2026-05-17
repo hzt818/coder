@@ -1,626 +1,181 @@
-# Coder — Enhanced Multi-Platform Build, Auto-Fix & CI Workflow
-#
-# Builds, tests, auto-fixes, and packages coder for:
-#   Linux (x86_64 / aarch64), macOS (x86_64 / aarch64), Windows (x86_64)
-#
-# Features:
-#   - Auto-format fix (cargo fmt) → auto PR
-#   - Auto-clippy fix (cargo clippy --fix) → auto PR
-#   - Auto-compile fix (cargo fix) → retry up to 3 times
-#   - Auto-create GitHub Issue on unrecoverable failure
-#   - Security audit (cargo audit)
-#   - npm binary distribution
-#   - GitHub Release on tag push
-
-name: build
+name: Build
 
 on:
   push:
-    branches: [master, main, develop]
-    tags: ["v*"]
+    branches: [master, main]
   pull_request:
     branches: [master, main]
-  workflow_dispatch:
-    inputs:
-      publish_npm:
-        description: "Publish to npm (requires NPM_TOKEN secret)"
-        type: boolean
-        default: false
+  release:
+    types: [published]
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  # ===== 1. Lint — Format & Clippy =====
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    outputs:
-      fmt_failed: ${{ steps.fmt.outputs.failed }}
-      clippy_failed: ${{ steps.clippy.outputs.failed }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal --no-self-update
-          rustup component add clippy rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
-      - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev libdbus-1-dev pkg-config
-
-      - id: fmt
-        name: Format check
-        continue-on-error: true
-        run: |
-          if cargo fmt --all --check; then
-            echo "failed=false" >> $GITHUB_OUTPUT
-          else
-            echo "failed=true" >> $GITHUB_OUTPUT
-          fi
-
-      - id: clippy
-        name: Clippy check
-        continue-on-error: true
-        run: |
-          if cargo clippy --all-targets 2>&1; then
-            echo "failed=false" >> $GITHUB_OUTPUT
-          else
-            echo "failed=true" >> $GITHUB_OUTPUT
-          fi
-
-  # ===== 2. Auto-Fix — Auto-apply fixes & create PR =====
-  auto-fix:
-    name: Auto-Fix
-    needs: [lint]
-    if: |
-      always()
-      && (needs.lint.outputs.fmt_failed == 'true' || needs.lint.outputs.clippy_failed == 'true')
-      && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal --no-self-update
-          rustup component add clippy rustfmt
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-
-      - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev libdbus-1-dev pkg-config
-
-      - name: Auto cargo fmt
-        if: needs.lint.outputs.fmt_failed == 'true'
-        run: cargo fmt --all
-
-      - name: Auto cargo clippy --fix
-        if: needs.lint.outputs.clippy_failed == 'true'
-        run: cargo clippy --fix --allow-dirty --allow-staged 2>&1 || true
-
-      - name: Create auto-fix PR
-        uses: peter-evans/create-pull-request@v7
-        with:
-          commit-message: "ci: auto-fix fmt/clippy issues"
-          title: "🤖 Auto-Fix: format & clippy corrections"
-          body: |
-            This PR was automatically created by the CI auto-fix workflow.
-
-            **Fixes applied:**
-            - `cargo fmt --all`
-            - `cargo clippy --fix --allow-dirty`
-
-            Please review the changes before merging.
-          branch: auto-fix/${{ github.head_ref || github.ref_name }}
-          delete-branch: true
-
-  # ===== 3. Security Audit =====
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal --no-self-update
-
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
-
-      - name: Run cargo audit
-        run: cargo audit
-
-      - name: Attempt cargo update on audit failure
-        if: failure()
-        run: |
-          cargo update
-          cargo audit || echo "::warning::Security audit still failing after cargo update"
-
-  # ===== 4. Build Check — Multi-feature matrix =====
-  build-check:
-    name: Build (${{ matrix.name }})
-    needs: [lint]
-    if: |
-      always()
-      && (needs.lint.result == 'success' || needs.lint.result == 'skipped')
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Default Features
-            features: ""
-            os: ubuntu-latest
-
-          - name: Minimal Features
-            features: --no-default-features --features ai-openai
-            os: ubuntu-latest
-
-          - name: All Features (Linux)
-            features: --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,team,skill,subagent,memory,storage,server,mcp,lsp,sync,analytics,permission,computer,worktree"
-            os: ubuntu-latest
-
-          - name: macOS
-            features: ""
-            os: macos-latest
-
-          - name: Windows
-            features: ""
-            os: windows-latest
-
+  build:
+    name: ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal --no-self-update
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          key: build-check-${{ matrix.name }}
-
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev libdbus-1-dev pkg-config
-
-      - name: cargo build
-        id: build
-        continue-on-error: true
-        run: cargo build ${{ matrix.features }}
-
-      - name: Auto-fix & retry on build failure
-        if: steps.build.outcome == 'failure'
-        id: fix-retry
-        run: |
-          RETRY_COUNT=0
-          MAX_RETRIES=3
-          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            echo "::group::Auto-fix attempt $((RETRY_COUNT + 1))/$MAX_RETRIES"
-            cargo fix --allow-dirty --allow-staged 2>&1 || true
-            if cargo build ${{ matrix.features }}; then
-              echo "fixed=true" >> $GITHUB_OUTPUT
-              echo "::endgroup::"
-              echo "::notice::Build fixed after $((RETRY_COUNT + 1)) attempt(s)"
-              exit 0
-            fi
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            echo "::endgroup::"
-          done
-          echo "fixed=false" >> $GITHUB_OUTPUT
-          echo "::error::Build still failing after $MAX_RETRIES auto-fix attempts"
-          exit 1
-
-      - name: Create auto-fix PR for build fixes
-        if: steps.fix-retry.outputs.fixed == 'true'
-        uses: peter-evans/create-pull-request@v7
-        with:
-          commit-message: "ci: auto-fix build errors"
-          title: "🤖 Auto-Fix: build compilation corrections"
-          body: |
-            This PR was automatically created by the CI auto-fix workflow.
-
-            **Fixes applied:**
-            - `cargo fix --allow-dirty` (up to 3 retries)
-
-            Please review the changes before merging.
-          branch: auto-fix-build/${{ github.head_ref || github.ref_name }}
-          delete-branch: true
-
-      - name: Fail job if build could not be fixed
-        if: steps.fix-retry.outputs.fixed == 'false'
-        run: exit 1
-
-  # ===== 5. Test — Cross-platform =====
-  test:
-    name: Test (${{ matrix.os }})
-    needs: [build-check]
-    if: |
-      always()
-      && (needs.build-check.result == 'success' || needs.build-check.result == 'skipped')
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal --no-self-update
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          key: test-${{ matrix.os }}
-
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev libdbus-1-dev pkg-config
-
-      - run: cargo test
-
-      - run: cargo test --no-default-features --features ai-openai
-        if: runner.os == 'Linux'
-
-  # ===== 6. Release Build — Full platform matrix =====
-  build-release:
-    name: Release (${{ matrix.target }})
-    needs: [test]
-    if: |
-      always()
-      && (needs.test.result == 'success' || needs.test.result == 'skipped')
-      && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact_name: coder-linux-x86_64
-
+            os: ubuntu-24.04
+            ext: ""
+            features: "ai-openai,ai-anthropic,ai-opencode"
           - target: aarch64-unknown-linux-gnu
-            os: ubuntu-latest
-            artifact_name: coder-linux-aarch64
-            features: "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,team,skill,subagent,memory,storage,server,mcp,lsp,sync,analytics,permission,computer,worktree"
-
+            os: ubuntu-24.04-arm
+            ext: ""
+            features: "ai-openai,ai-anthropic,ai-opencode"
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-24.04
+            ext: ""
+            features: "ai-openai"
           - target: x86_64-apple-darwin
-            os: macos-13
-            artifact_name: coder-macos-x86_64
-
+            os: macos-14
+            ext: ""
+            features: "ai-openai,ai-anthropic,ai-opencode"
           - target: aarch64-apple-darwin
-            os: macos-latest
-            artifact_name: coder-macos-aarch64
-
+            os: macos-14
+            ext: ""
+            features: "ai-openai,ai-anthropic,ai-opencode"
           - target: x86_64-pc-windows-msvc
-            os: windows-latest
-            artifact_name: coder-windows-x86_64.exe
+            os: windows-2022
+            ext: ".exe"
+            features: "ai-openai,ai-anthropic,ai-opencode"
+          - target: aarch64-pc-windows-msvc
+            os: windows-2022
+            ext: ".exe"
+            features: "ai-openai,ai-anthropic,ai-opencode"
 
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        run: |
-          rustup toolchain install stable --profile minimal --no-self-update
-          rustup target add ${{ matrix.target }}
-
-      - uses: Swatinem/rust-cache@v2
+        uses: dtolnay/rust-toolchain@stable
         with:
-          cache-on-failure: true
-          key: release-${{ matrix.target }}-v2
+          targets: ${{ matrix.target }}
 
       - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev libdbus-1-dev pkg-config
+        if: contains(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libdbus-1-dev \
+            libfontconfig-dev
 
-      - name: Install cross-compilation tools (Linux aarch64)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: sudo apt-get install -y -qq gcc-aarch64-linux-gnu
+      - name: Install musl-tools (Linux musl)
+        if: contains(matrix.target, 'linux-musl')
+        run: sudo apt-get install -y musl-tools
 
-      - name: cargo build --release
-        shell: bash
+      - name: Build
         run: |
           FEATURES="${{ matrix.features }}"
-          if [ -z "$FEATURES" ]; then
-            FEATURES="--all-features"
-          else
-            FEATURES="--features ${FEATURES}"
-          fi
-          cargo build --release --target ${{ matrix.target }} ${FEATURES}
-        env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          cargo build --release --target ${{ matrix.target }} --features "$FEATURES"
 
-      - name: Strip binary (Linux)
-        if: startsWith(matrix.target, 'x86_64-unknown-linux') || matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          if command -v aarch64-linux-gnu-strip &>/dev/null; then
-            aarch64-linux-gnu-strip target/${{ matrix.target }}/release/coder
-          else
-            strip target/${{ matrix.target }}/release/coder
-          fi
-
-      - name: Strip binary (macOS)
-        if: startsWith(matrix.target, 'aarch64-apple-darwin') || matrix.target == 'x86_64-apple-darwin'
-        run: strip -d target/${{ matrix.target }}/release/coder 2>/dev/null || true
-
-      - name: Upload binary artifact
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            target/${{ matrix.target }}/release/coder
-            target/${{ matrix.target }}/release/coder.exe
-          compression-level: 0
+          name: coder-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/coder${{ matrix.ext }}
           if-no-files-found: error
 
-  # ===== 7. npm Package =====
-  npm:
-    name: npm Package
-    if: |
-      always()
-      && (needs.build-release.result == 'success')
-      && (
-        github.ref == 'refs/heads/master'
-        || github.ref == 'refs/heads/main'
-        || startsWith(github.ref, 'refs/tags/v')
-        || (github.event_name == 'workflow_dispatch' && inputs.publish_npm)
-      )
-    needs: [build-release]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  build-all-features:
+    name: all-features-${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+            ext: ""
+          - target: x86_64-apple-darwin
+            os: macos-14
+            ext: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+            ext: ".exe"
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: artifacts
+          targets: ${{ matrix.target }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Install system dependencies (Linux)
+        if: contains(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libdbus-1-dev \
+            libfontconfig-dev
+
+      - name: Build with all features
+        run: |
+          cargo build --release --target ${{ matrix.target }} \
+            --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,computer,worktree"
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
         with:
-          node-version: "20"
-          registry-url: "https://registry.npmjs.org"
+          name: coder-${{ matrix.target }}-all-features
+          path: target/${{ matrix.target }}/release/coder${{ matrix.ext }}
+          if-no-files-found: error
 
-      - name: Prepare npm package
-        run: |
-          set -e
-          mkdir -p npm-package/bin
+  test:
+    name: test-${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+          - target: x86_64-apple-darwin
+            os: macos-14
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
 
-          PLATFORMS="linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64 windows-x86_64"
-          for plat in $PLATFORMS; do
-            dir="${{ github.workspace }}/artifacts/coder-${plat}"
-            if [ -d "$dir" ]; then
-              mkdir -p "npm-package/bin/${plat}"
-              find "$dir" -maxdepth 1 -type f -exec cp {} "npm-package/bin/${plat}/" \;
-              echo "Copied artifacts for ${plat}"
-            else
-              echo "Warning: no artifacts found for ${plat}"
-            fi
-          done
-
-      - name: Write npm package.json
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          VERSION="${VERSION:-0.1.0}"
-
-          cat > npm-package/package.json << PKGJSON
-          {
-            "name": "coder",
-            "version": "${VERSION}",
-            "description": "AI-powered terminal development environment — Rust-based CLI",
-            "bin": {
-              "coder": "./install.js"
-            },
-            "repository": {
-              "type": "git",
-              "url": "git+https://github.com/${GITHUB_REPOSITORY}.git"
-            },
-            "keywords": ["ai", "coding", "terminal", "tui", "rust"],
-            "license": "MIT",
-            "os": ["linux", "darwin", "win32"],
-            "cpu": ["x64", "arm64"],
-            "engines": {
-              "node": ">=18"
-            }
-          }
-          PKGJSON
-
-      - name: Write install.js
-        run: |
-          cat > npm-package/install.js << 'INSTALLJS'
-          #!/usr/bin/env node
-          const { spawnSync } = require("child_process");
-          const path = require("path");
-          const fs = require("fs");
-
-          const platformMap = {
-            linux: { x64: "linux-x86_64", arm64: "linux-aarch64" },
-            darwin: { x64: "macos-x86_64", arm64: "macos-aarch64" },
-            win32: { x64: "windows-x86_64" },
-          };
-
-          const plat = platformMap[process.platform];
-          if (!plat) {
-            console.error("Unsupported platform:", process.platform);
-            process.exit(1);
-          }
-
-          const arch = plat[process.arch];
-          if (!arch) {
-            console.error("Unsupported architecture:", process.arch);
-            process.exit(1);
-          }
-
-          const binDir = path.join(__dirname, "bin", arch);
-          let binPath = path.join(binDir, "coder");
-
-          if (process.platform === "win32") {
-            binPath += ".exe";
-          }
-
-          if (!fs.existsSync(binPath)) {
-            console.error("Binary not found for", process.platform, process.arch);
-            console.error("Looked at:", binPath);
-            process.exit(1);
-          }
-
-          const result = spawnSync(binPath, process.argv.slice(2), {
-            stdio: "inherit",
-          });
-
-          process.exit(result.status ?? 1);
-          INSTALLJS
-          chmod +x npm-package/install.js
-
-      - name: Write README
-        run: |
-          cat > npm-package/README.md << 'README'
-          # Coder
-
-          AI-powered terminal development environment.
-
-          ## Install
-
-          ```bash
-          npm install -g coder
-          ```
-
-          ## Usage
-
-          ```bash
-          coder
-          coder --help
-          ```
-          README
-
-      - name: Publish to npm
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_npm
-        run: |
-          cd npm-package
-          npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: npm publish dry-run
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') && !inputs.publish_npm }}
-        run: |
-          cd npm-package
-          npm publish --dry-run
-
-  # ===== 8. GitHub Release =====
-  release:
-    name: GitHub Release
-    if: |
-      always()
-      && startsWith(github.ref, 'refs/tags/v')
-      && (needs.build-release.result == 'success')
-    needs: [build-release]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Organize release assets
+      - name: Install system dependencies (Linux)
+        if: contains(matrix.target, 'linux')
         run: |
-          mkdir -p release-assets
-          for dir in artifacts/*/; do
-            base=$(basename "$dir")
-            find "$dir" -maxdepth 1 -type f -exec cp {} "release-assets/${base}" \;
-          done
-          ls -la release-assets/
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Coder ${{ github.ref_name }}
-          files: release-assets/*
-          generate_release_notes: true
+      - name: Run tests
+        run: cargo test --features "ai-openai,ai-anthropic,ai-opencode"
 
-  # ===== 9. Auto-Create Issue on Failure =====
-  create-issue:
-    name: Create Issue on Failure
-    needs: [build-check, test, build-release, audit]
-    if: |
-      always()
-      && (
-        needs.build-check.result == 'failure'
-        || needs.test.result == 'failure'
-        || needs.build-release.result == 'failure'
-        || needs.audit.result == 'failure'
-      )
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build failure report
-        id: report
-        run: |
-          {
-            echo "report<<EOF"
-            echo "## CI Failure Report"
-            echo ""
-            echo "**Branch:** ${{ github.ref_name }}"
-            echo "**Trigger:** ${{ github.event_name }}"
-            echo "**Commit:** ${{ github.sha }}"
-            if [ "${{ github.event_name }}" = "pull_request" ]; then
-              echo "**PR:** #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}"
-            fi
-            echo ""
-            echo "### Failed Jobs"
-            if [ "${{ needs.build-check.result }}" = "failure" ]; then
-              echo "- **Build Check** — multi-feature compilation failed"
-            fi
-            if [ "${{ needs.test.result }}" = "failure" ]; then
-              echo "- **Test** — cross-platform tests failed"
-            fi
-            if [ "${{ needs.build-release.result }}" = "failure" ]; then
-              echo "- **Release Build** — platform release compilation failed"
-            fi
-            if [ "${{ needs.audit.result }}" = "failure" ]; then
-              echo "- **Security Audit** — cargo audit found vulnerabilities"
-            fi
-            echo ""
-            echo "### Workflow URL"
-            echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            echo ""
-            echo "> Auto-created by CI failure handler"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Issue
-        uses: dacbd/create-issue-action@v2
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          title: "🚨 CI Failure: ${{ github.ref_name }}"
-          body: ${{ steps.report.outputs.report }}
-          labels: "bug,ci-failure"
-          assignees: ""
+          components: clippy, rustfmt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
+
+      - name: Clippy
+        run: cargo clippy --all-targets --features "ai-openai,ai-anthropic,ai-opencode" -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --check
