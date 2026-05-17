@@ -3,22 +3,132 @@ name: Build
 on:
   push:
     branches: [master, main]
+    tags: ["v*"]
   pull_request:
     branches: [master, main]
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Build profile"
+        default: "release"
+        type: choice
+        options: [release, debug]
+  schedule:
+    - cron: "0 6 * * 1" # Every Monday 6AM UTC
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ──────────────────────────────────────────────
+# Shared setup
+# ──────────────────────────────────────────────
 jobs:
-  build:
-    name: ${{ matrix.target }}
+  # ── Security Audit ──────────────────────────
+  audit:
+    name: Security audit
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: Run audit
+        run: cargo audit --deny warnings
+
+  # ── Lint & Format ───────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libdbus-1-dev \
+            libfontconfig-dev
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --features "ai-openai,ai-anthropic,ai-opencode" -- -D warnings
+
+  # ── Test ────────────────────────────────────
+  test:
+    name: Test (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-24.04
+          - target: x86_64-apple-darwin
+            os: macos-14
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        if: contains(matrix.target, 'linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Run tests
+        run: cargo test --features "ai-openai,ai-anthropic,ai-opencode"
+
+  # ── Build ───────────────────────────────────
+  build:
+    name: Build (${{ matrix.target }})
+    needs: [lint, test]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Default features ──
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-24.04
             ext: ""
@@ -27,10 +137,13 @@ jobs:
             os: ubuntu-24.04-arm
             ext: ""
             features: "ai-openai,ai-anthropic,ai-opencode"
+            # arm runner is slower — give it more time
+            timeout: 60
           - target: x86_64-unknown-linux-musl
             os: ubuntu-24.04
             ext: ""
             features: "ai-openai"
+            no-default-features: true
           - target: x86_64-apple-darwin
             os: macos-14
             ext: ""
@@ -48,6 +161,8 @@ jobs:
             ext: ".exe"
             features: "ai-openai,ai-anthropic,ai-opencode"
 
+    timeout-minutes: ${{ matrix.timeout || 45 }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -56,8 +171,9 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install system dependencies (Linux)
-        if: contains(matrix.target, 'linux')
+      # ── Linux system deps ──
+      - name: Install system dependencies (Linux gnu)
+        if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -66,24 +182,69 @@ jobs:
             libdbus-1-dev \
             libfontconfig-dev
 
-      - name: Install musl-tools (Linux musl)
+      - name: Install system dependencies (Linux musl)
         if: contains(matrix.target, 'linux-musl')
-        run: sudo apt-get install -y musl-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            musl-tools \
+            pkg-config
+
+      # ── macOS system deps ──
+      - name: Install system dependencies (macOS)
+        if: contains(matrix.target, 'apple-darwin')
+        run: |
+          # cpal / audio on macOS needs CoreAudio (provided by OS SDK)
+          # hound (WAV) is pure Rust
+          # enigo / screenshots need accessibility permissions at runtime
+          brew install pkg-config
+
+      # ── Windows system deps ──
+      - name: Install system dependencies (Windows)
+        if: contains(matrix.target, 'windows')
+        run: |
+          # All Windows deps are provided by the platform SDK
+          echo "Windows SDK is pre-installed on windows-2022"
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          key: ${{ matrix.target }}
 
       - name: Build
         run: |
-          FEATURES="${{ matrix.features }}"
-          cargo build --release --target ${{ matrix.target }} --features "$FEATURES"
+          features="${{ matrix.features }}"
+          no_def="${{ matrix.no-default-features }}"
+          if [ "$no_def" = "true" ]; then
+            cargo build --release --target "${{ matrix.target }}" --no-default-features --features "$features"
+          else
+            cargo build --release --target "${{ matrix.target }}" --features "$features"
+          fi
 
-      - name: Upload binary
+      - name: Report binary size
+        run: |
+          bin="target/${{ matrix.target }}/release/coder${{ matrix.ext }}"
+          if [ -f "$bin" ]; then
+            size=$(stat --format=%s "$bin" 2>/dev/null || stat -f%z "$bin" 2>/dev/null)
+            echo "Binary size: $(numfmt --to=iec $size)"
+            echo "binary_size=$size" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: coder-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/coder${{ matrix.ext }}
           if-no-files-found: error
+          retention-days: 30
 
+  # ── Build (all features) ────────────────────
   build-all-features:
-    name: all-features-${{ matrix.target }}
+    name: All features (${{ matrix.target }})
+    needs: [lint, test]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -92,6 +253,7 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-24.04
             ext: ""
+            deps: pkg-config libssl-dev libdbus-1-dev libfontconfig-dev libasound2-dev
           - target: x86_64-apple-darwin
             os: macos-14
             ext: ""
@@ -99,6 +261,8 @@ jobs:
             os: windows-2022
             ext: ".exe"
 
+    timeout-minutes: 60
+
     steps:
       - uses: actions/checkout@v4
 
@@ -108,74 +272,164 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install system dependencies (Linux)
-        if: contains(matrix.target, 'linux')
+        if: contains(matrix.target, 'linux') && matrix.deps != ''
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            pkg-config \
-            libssl-dev \
-            libdbus-1-dev \
-            libfontconfig-dev
+          sudo apt-get install -y ${{ matrix.deps }}
+
+      - name: Install system dependencies (macOS)
+        if: contains(matrix.target, 'apple-darwin')
+        run: brew install pkg-config
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+          key: ${{ matrix.target }}-all
 
       - name: Build with all features
         run: |
-          cargo build --release --target ${{ matrix.target }} \
+          cargo build --release --target "${{ matrix.target }}" \
             --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,computer,worktree"
 
-      - name: Upload binary
+      - name: Report binary size
+        run: |
+          bin="target/${{ matrix.target }}/release/coder${{ matrix.ext }}"
+          if [ -f "$bin" ]; then
+            size=$(stat --format=%s "$bin" 2>/dev/null || stat -f%z "$bin" 2>/dev/null)
+            echo "Binary size: $(numfmt --to=iec $size)"
+          fi
+        shell: bash
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: coder-${{ matrix.target }}-all-features
           path: target/${{ matrix.target }}/release/coder${{ matrix.ext }}
           if-no-files-found: error
+          retention-days: 30
 
-  test:
-    name: test-${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: x86_64-unknown-linux-gnu
-            os: ubuntu-24.04
-          - target: x86_64-apple-darwin
-            os: macos-14
-          - target: x86_64-pc-windows-msvc
-            os: windows-2022
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install system dependencies (Linux)
-        if: contains(matrix.target, 'linux')
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
-
-      - name: Run tests
-        run: cargo test --features "ai-openai,ai-anthropic,ai-opencode"
-
-  lint:
-    name: lint
+  # ── RELEASE: Draft / Upload ─────────────────
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
+    needs: [build, build-all-features]
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-
-      - name: Install system dependencies
+      - name: Fetch version
+        id: version
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
+          # Try tag name first, then fall back to Cargo.toml
+          tag="${GITHUB_REF_NAME}"
+          if [ -n "$tag" ] && echo "$tag" | grep -q '^v'; then
+            echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          else
+            ver=$(grep '^version =' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            echo "version=$ver" >> "$GITHUB_OUTPUT"
+            echo "tag=v$ver" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Clippy
-        run: cargo clippy --all-targets --features "ai-openai,ai-anthropic,ai-opencode" -- -D warnings
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts-to-upload
 
-      - name: Format check
-        run: cargo fmt --check
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cd artifacts-to-upload
+
+          for dir in */; do
+            dir_name="${dir%/}"
+            # Skip all-features dirs for the standard release
+            case "$dir_name" in
+              *-all-features) continue ;;
+            esac
+
+            binary="$dir_name/coder"*
+            if [ -f $binary ]; then
+              ext=""
+              case "$dir_name" in
+                *windows*) ext=".exe" ;;
+              esac
+              cp $binary "../release-assets/coder-${dir_name}${ext}"
+              echo "Packaged: coder-${dir_name}${ext}"
+            fi
+          done
+
+          # Also add all-features builds
+          for dir in artifacts-to-upload/*-all-features/; do
+            dir_name="$(basename "$dir")"
+            binary="$dir/coder"*
+            if [ -f $binary ]; then
+              platform="${dir_name%-all-features}"
+              ext=""
+              case "$platform" in
+                *windows*) ext=".exe" ;;
+              esac
+              cp $binary "release-assets/coder-${platform}-full${ext}"
+              echo "Packaged: coder-${platform}-full${ext}"
+            fi
+          done
+
+      - name: Generate release checksums
+        working-directory: release-assets
+        run: |
+          sha256sum * > checksums.txt
+          cat checksums.txt
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: coder ${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          draft: true
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: release-assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Summary ─────────────────────────────────
+  summary:
+    name: Build summary
+    if: always()
+    needs: [lint, test, build, build-all-features, audit]
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Summarize results
+        run: |
+          echo "## CI Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          declare -A STATUS
+          STATUS['lint']=${{ needs.lint.result }}
+          STATUS['test (x86_64-unknown-linux-gnu)']=${{ needs.test.result }}
+          STATUS['test (x86_64-apple-darwin)']=${{ needs.test.result }}
+          STATUS['test (x86_64-pc-windows-msvc)']=${{ needs.test.result }}
+          STATUS['audit']=${{ needs.audit.result }}
+
+          echo "| Job | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----|--------|" >> "$GITHUB_STEP_SUMMARY"
+
+          for job in "${!STATUS[@]}"; do
+            s="${STATUS[$job]}"
+            icon="✅"
+            [ "$s" = "failure" ] && icon="❌"
+            [ "$s" = "cancelled" ] && icon="⏭️"
+            [ "$s" = "skipped" ] && icon="⏩"
+            echo "| $job | $icon $s |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "See Artifacts section above ⬆️ for downloadable binaries." >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
