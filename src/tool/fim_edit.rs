@@ -152,7 +152,7 @@ async fn ai_fim_completion(prefix: &str, suffix: &str, instructions: &str) -> Op
     });
 
     let resp = client
-        .post(&format!("{}/chat/completions", base_url))
+        .post(format!("{}/chat/completions", base_url))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&body)
@@ -213,7 +213,7 @@ pub fn fim_simple(prefix: &str, suffix: &str, middle: &str, instructions: &str) 
     }
 
     if trimmed_prefix.ends_with('=') {
-        if let Some(after_colon) = prefix.trim().splitn(2, ':').nth(1) {
+        if let Some(after_colon) = prefix.trim().split_once(':').map(|x| x.1) {
             let type_str = after_colon.trim_end_matches('=').trim();
             if !type_str.is_empty() && !type_str.contains(' ') {
                 let default = match type_str {

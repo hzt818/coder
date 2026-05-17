@@ -25,6 +25,12 @@ pub struct MonitorManager {
     next_id: std::sync::atomic::AtomicU64,
 }
 
+impl Default for MonitorManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MonitorManager {
     pub fn new() -> Self {
         Self {
@@ -67,10 +73,10 @@ impl MonitorManager {
         std::thread::spawn(move || {
             use std::io::BufRead;
             let reader = std::io::BufReader::new(stdout);
-            for line in reader.lines().flatten() {
+            for line in reader.lines().map_while(Result::ok) {
                 let should_store = filter_clone
                     .as_ref()
-                    .map_or(true, |f| line.to_lowercase().contains(f));
+                    .is_none_or(|f| line.to_lowercase().contains(f));
                 if should_store {
                     if let Ok(mut l) = lines_clone.lock() {
                         l.push(line);
@@ -173,7 +179,7 @@ impl Tool for MonitorTool {
 use std::sync::OnceLock;
 fn monitor_instance() -> &'static MonitorManager {
     static M: OnceLock<MonitorManager> = OnceLock::new();
-    M.get_or_init(|| MonitorManager::new())
+    M.get_or_init(MonitorManager::new)
 }
 
 #[cfg(test)]

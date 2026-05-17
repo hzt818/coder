@@ -61,6 +61,12 @@ pub struct BackgroundShellManager {
     next_id: std::sync::atomic::AtomicU64,
 }
 
+impl Default for BackgroundShellManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BackgroundShellManager {
     pub fn new() -> Self {
         Self {
@@ -237,7 +243,7 @@ impl BackgroundShellManager {
 use std::sync::OnceLock;
 fn bg_manager() -> &'static BackgroundShellManager {
     static BG: OnceLock<BackgroundShellManager> = OnceLock::new();
-    BG.get_or_init(|| BackgroundShellManager::new())
+    BG.get_or_init(BackgroundShellManager::new)
 }
 
 pub struct TaskShellStart;

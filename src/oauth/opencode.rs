@@ -121,6 +121,7 @@ async fn start_callback_server(
     #[derive(Deserialize)]
     struct CallbackParams {
         code: Option<String>,
+        #[allow(dead_code)]
         state: Option<String>,
         error: Option<String>,
         error_description: Option<String>,

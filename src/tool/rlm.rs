@@ -44,7 +44,7 @@ impl Tool for RlmTool {
             .get("max_parallel")
             .and_then(|m| m.as_i64())
             .unwrap_or(4);
-        if max_parallel < 1 || max_parallel > 16 {
+        if !(1..=16).contains(&max_parallel) {
             return ToolResult::err("max_parallel must be between 1 and 16");
         }
 
@@ -134,7 +134,7 @@ impl Tool for RlmTool {
                     match &client {
                         Ok(c) => {
                             let resp = c
-                                .post(&format!("{}/chat/completions", bu))
+                                .post(format!("{}/chat/completions", bu))
                                 .header("Authorization", format!("Bearer {}", ak))
                                 .header("Content-Type", "application/json")
                                 .json(&body)

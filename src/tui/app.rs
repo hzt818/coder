@@ -282,7 +282,7 @@ impl App {
             return;
         }
         let before = &self.input[..self.cursor_pos];
-        if let Some(pos) = before.rfind(|c: char| c == ' ' || c == '/' || c == '!' || c == '@') {
+        if let Some(pos) = before.rfind([' ', '/', '!', '@']) {
             let delete_len = self.cursor_pos - pos;
             for _ in 0..delete_len {
                 self.input.remove(pos);
@@ -463,10 +463,10 @@ impl App {
             InputCommand::Help(topic) => {
                 let help = if topic.is_empty() {
                     help::format_all()
-                } else if let Some(detailed) = help::get_help(&topic) {
+                } else if let Some(detailed) = help::get_help(topic) {
                     detailed
                 } else {
-                    help::search(&topic)
+                    help::search(topic)
                 };
                 (true, Some(help))
             }
@@ -1028,7 +1028,7 @@ impl App {
                         });
                     }
                 }
-                self.status = format!("🔧 Running tool...");
+                self.status = "🔧 Running tool...".to_string();
             }
             AgentEvent::ToolResult { tool_name, result } => {
                 if let Some(last) = self.messages.last_mut() {

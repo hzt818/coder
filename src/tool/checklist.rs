@@ -183,8 +183,8 @@ impl Tool for ChecklistTool {
                     output.push_str(&format!("Goal: {}\n\n", g));
                 }
                 output.push_str(&format!("Created {} checklist item(s):\n", items.len()));
-                for i in 0..items.len() {
-                    output.push_str(&format!("  #{} - {}\n", start_id + i, items[i]));
+                for (i, item) in items.iter().enumerate() {
+                    output.push_str(&format!("  #{} - {}\n", start_id + i, item));
                 }
 
                 ToolResult::ok(output)
@@ -224,8 +224,8 @@ impl Tool for ChecklistTool {
 
                 let mut output = String::new();
                 output.push_str(&format!("Added {} item(s):\n", items.len()));
-                for i in 0..items.len() {
-                    output.push_str(&format!("  #{} - {}\n", start_id + i, items[i]));
+                for (i, item) in items.iter().enumerate() {
+                    output.push_str(&format!("  #{} - {}\n", start_id + i, item));
                 }
 
                 ToolResult::ok(output)

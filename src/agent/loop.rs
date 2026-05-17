@@ -148,10 +148,7 @@ impl Agent {
         }
 
         // For tools that explicitly require permission, check with evaluator
-        let tool = match self.tools.get(tool_name) {
-            Some(t) => t,
-            None => return None,
-        };
+        let tool = self.tools.get(tool_name)?;
 
         if !tool.requires_permission() {
             return None;
@@ -163,7 +160,7 @@ impl Agent {
                 "Tool '{}' requires permission (permission feature not enabled), allowing",
                 tool_name
             );
-            return None;
+            None
         }
 
         #[cfg(feature = "permission")]
@@ -336,11 +333,11 @@ impl Agent {
                                 final_stop_reason = stop_reason;
                                 final_usage = usage;
                             }
-                            StreamEvent::Error(e) => {
-                                if tx.send(AgentEvent::Error(e)).await.is_err() {
-                                    tracing::warn!("Agent event channel closed after error");
-                                    break;
-                                }
+                            StreamEvent::Error(e)
+                                if tx.send(AgentEvent::Error(e.clone())).await.is_err() =>
+                            {
+                                tracing::warn!("Agent event channel closed after error");
+                                break;
                             }
                             _ => {}
                         }

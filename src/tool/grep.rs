@@ -53,9 +53,9 @@ impl Tool for GrepTool {
         let file_glob = args.get("glob").and_then(|g| g.as_str()).unwrap_or("");
 
         // Try ripgrep first, fall back to grep/findstr
-        let result = try_search_rg(pattern, search_path, &file_glob)
+        let result = try_search_rg(pattern, search_path, file_glob)
             .await
-            .or_else(|_| try_search_fallback(pattern, search_path, &file_glob));
+            .or_else(|_| try_search_fallback(pattern, search_path, file_glob));
 
         match result {
             Ok(output) => {

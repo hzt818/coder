@@ -11,13 +11,13 @@ use super::theme::AppTheme;
 /// Get the global syntax set (loaded once)
 fn syntax_set() -> &'static SyntaxSet {
     static SS: OnceLock<SyntaxSet> = OnceLock::new();
-    SS.get_or_init(|| SyntaxSet::load_defaults_newlines())
+    SS.get_or_init(SyntaxSet::load_defaults_newlines)
 }
 
 /// Get the global theme set (loaded once)
 fn theme_set() -> &'static ThemeSet {
     static TS: OnceLock<ThemeSet> = OnceLock::new();
-    TS.get_or_init(|| ThemeSet::load_defaults())
+    TS.get_or_init(ThemeSet::load_defaults)
 }
 
 /// Highlight a fenced code block and return styled Lines.

@@ -99,7 +99,7 @@ async fn ai_generate_plan(goal: &str, constraints: &str) -> Option<String> {
     });
 
     let resp = client
-        .post(&format!("{}/chat/completions", base_url))
+        .post(format!("{}/chat/completions", base_url))
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&body)

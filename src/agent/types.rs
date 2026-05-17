@@ -3,9 +3,10 @@
 use serde::{Deserialize, Serialize};
 
 /// Types of agents with different specializations
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum AgentType {
     /// Full tool access, general coding (default)
+    #[default]
     Coding,
     /// Web search and research focused
     Research,
@@ -60,12 +61,6 @@ impl AgentType {
     }
 }
 
-impl Default for AgentType {
-    fn default() -> Self {
-        Self::Coding
-    }
-}
-
 impl std::fmt::Display for AgentType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.display_name())
@@ -78,9 +73,10 @@ impl std::fmt::Display for AgentType {
 /// - Plan: read-only tools only, no shell/patch execution
 /// - Agent: full tool access with approval gates (default)
 /// - YOLO: auto-approve all tools, no guardrails
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum InteractionMode {
     Plan,
+    #[default]
     Agent,
     Yolo,
 }
@@ -139,12 +135,6 @@ impl InteractionMode {
     }
 }
 
-impl Default for InteractionMode {
-    fn default() -> Self {
-        Self::Agent
-    }
-}
-
 impl std::fmt::Display for InteractionMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.display_name())
@@ -159,10 +149,11 @@ impl std::fmt::Display for InteractionMode {
 /// - High: standard reasoning (default)
 /// - Max: maximum reasoning depth
 /// - Auto: automatically chosen based on prompt content
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum ReasoningEffort {
     Off,
     Low,
+    #[default]
     High,
     Max,
     Auto,
@@ -204,12 +195,6 @@ impl ReasoningEffort {
             ReasoningEffort::Max => Some("max"),
             ReasoningEffort::Off | ReasoningEffort::Auto => None,
         }
-    }
-}
-
-impl Default for ReasoningEffort {
-    fn default() -> Self {
-        Self::High
     }
 }
 

@@ -100,7 +100,7 @@ async fn fetch_docs_web(library: &str, query: &str) -> Result<String, String> {
         .iter()
         .skip(start_idx)
         .take(200) // limit output
-        .map(|l| *l)
+        .copied()
         .collect();
 
     let mut result = format!("Documentation search for '{} {}':\n\n", library, query);

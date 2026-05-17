@@ -4,7 +4,7 @@
 //! restarts. Supports create, list, read, cancel, and status transitions.
 //! Uses the existing storage/sqlite.rs infrastructure.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 static TASK_MANAGER: Mutex<Option<TaskManager>> = Mutex::new(None);
@@ -96,7 +96,7 @@ impl TaskManager {
     }
 
     /// Load tasks from disk
-    fn load_tasks_from_disk(tasks_dir: &PathBuf) -> Vec<TaskRecord> {
+    fn load_tasks_from_disk(tasks_dir: &Path) -> Vec<TaskRecord> {
         let idx_path = tasks_dir.join("tasks.json");
         if idx_path.exists() {
             if let Ok(content) = std::fs::read_to_string(&idx_path) {

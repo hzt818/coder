@@ -164,7 +164,7 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
         ])
         .split(area);
 
-    let title = format!(" 🦀 Coder");
+    let title = " 🦀 Coder".to_string();
     let title_span = Span::styled(
         &title,
         Style::default()
@@ -510,17 +510,15 @@ fn handle_input_mode(app: &mut App, key: crossterm::event::KeyEvent) -> InputAct
         KeyCode::End => app.cursor_end(),
         KeyCode::Up => app.history_back(),
         KeyCode::Down => app.history_forward(),
-        KeyCode::Tab => {
-            if app.input.contains('@') {
-                let items = app.mention_candidates("");
-                if !items.is_empty() {
-                    app.input_submode = InputSubmode::Mention {
-                        query: String::new(),
-                        items,
-                        selected: 0,
-                    };
-                    app.mark_status_dirty();
-                }
+        KeyCode::Tab if app.input.contains('@') => {
+            let items = app.mention_candidates("");
+            if !items.is_empty() {
+                app.input_submode = InputSubmode::Mention {
+                    query: String::new(),
+                    items,
+                    selected: 0,
+                };
+                app.mark_status_dirty();
             }
         }
         KeyCode::Esc => {

@@ -239,7 +239,7 @@ impl SnapshotManager {
                 if let Some(snapshot_id) = rest.strip_prefix("snapshot: ") {
                     let label = snapshot_id.to_string();
                     snapshots.push(Snapshot {
-                        id: format!("{}", &hash[..8]),
+                        id: hash[..8].to_string(),
                         label,
                         timestamp: String::new(),
                         turn_number: 0,

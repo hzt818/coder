@@ -127,10 +127,7 @@ fn list_directory(
     // Format entries
     let max_name_len = entries
         .iter()
-        .map(|e| {
-            let len = e.name.len() + if e.is_dir { 1 } else { 0 };
-            len
-        })
+        .map(|e| e.name.len() + if e.is_dir { 1 } else { 0 })
         .max()
         .unwrap_or(0)
         .min(60);
@@ -216,10 +213,10 @@ fn collect_entries(
             let matches = ::glob::Pattern::new(pattern)
                 .map(|p| p.matches(&name))
                 .unwrap_or(false);
-            if !matches {
-                if entry.file_type().map(|t| !t.is_dir()).unwrap_or(true) {
-                    continue;
-                }
+            if !matches
+                && entry.file_type().map(|t| !t.is_dir()).unwrap_or(true)
+            {
+                continue;
             }
         }
 
@@ -263,11 +260,7 @@ fn collect_entries(
                 .file_name()
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
-            if depth == 1 {
-                format!("{}/{}", parent, name)
-            } else {
-                format!("{}/{}", parent, name) // simplified for deep nesting
-            }
+            format!("{}/{}", parent, name)
         };
 
         entries.push(DirEntry {

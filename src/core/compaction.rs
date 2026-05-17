@@ -57,7 +57,7 @@ impl CompactionResult {
 pub fn estimate_message_tokens(messages: &[Message]) -> usize {
     messages
         .iter()
-        .map(|m| estimate_tokens_for_message(m))
+        .map(estimate_tokens_for_message)
         .sum()
 }
 
