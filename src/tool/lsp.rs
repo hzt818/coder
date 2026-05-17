@@ -48,7 +48,7 @@ fn language_for_extension(path: &str) -> Option<(&'static str, &'static str, Vec
 }
 
 /// Format an LSP location (URI + range) into a human-readable string.
-#[cfg(any(feature = "lsp", test))]
+#[cfg(feature = "lsp")]
 fn format_location(uri: &str, range: &serde_json::Value) -> String {
     let start = range
         .get("start")

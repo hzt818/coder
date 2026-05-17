@@ -1,0 +1,2 @@
+error: patch for `aes-gcm` points to the same source, but patches must point to different sources
+help: check `aes-gcm` patch definition for `https://github.com/rust-lang/crates.io-index` in `/mnt/d/Coder/coder/Cargo.toml`

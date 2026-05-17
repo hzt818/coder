@@ -149,6 +149,6 @@ mod tests {
             .execute(serde_json::json!({"symbol": "ZZZZZZZZ"}))
             .await;
         // Should handle gracefully (error, not panic)
-        assert!(!r.success || r.output.len() > 0);
+        assert!(!r.success || !r.output.is_empty());
     }
 }

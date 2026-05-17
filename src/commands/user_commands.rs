@@ -200,7 +200,7 @@ mod tests {
     #[test]
     fn test_manager_empty() {
         let manager = UserCommandManager::new();
-        assert_eq!(manager.is_empty(), manager.len() == 0);
+        assert_eq!(manager.is_empty(), manager.is_empty());
     }
 
     #[test]

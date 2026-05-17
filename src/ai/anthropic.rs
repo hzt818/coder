@@ -160,12 +160,7 @@ impl Provider for AnthropicProvider {
 
                 buf.extend_from_slice(&chunk);
 
-                loop {
-                    let newline_pos = match buf.iter().position(|&b| b == b'\n') {
-                        Some(p) => p,
-                        None => break,
-                    };
-
+                while let Some(newline_pos) = buf.iter().position(|&b| b == b'\n') {
                     let mut line_bytes: Vec<u8> = buf.drain(..newline_pos).collect();
                     buf.remove(0);
                     if line_bytes.last() == Some(&b'\r') {

@@ -3,6 +3,7 @@
 //! Provides cron-style scheduled automation with lifecycle management.
 
 use std::sync::Mutex;
+use std::str::FromStr;
 
 static AUTOMATION_MANAGER: Mutex<Option<AutomationManager>> = Mutex::new(None);
 
@@ -40,12 +41,16 @@ impl AutomationStatus {
             AutomationStatus::Completed => "completed",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Self {
+impl FromStr for AutomationStatus {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "paused" => AutomationStatus::Paused,
-            "completed" => AutomationStatus::Completed,
-            _ => AutomationStatus::Active,
+            "paused" => Ok(AutomationStatus::Paused),
+            "completed" => Ok(AutomationStatus::Completed),
+            _ => Ok(AutomationStatus::Active),
         }
     }
 }
@@ -285,11 +290,11 @@ mod tests {
         assert_eq!(AutomationStatus::Active.as_str(), "active");
         assert_eq!(AutomationStatus::Paused.as_str(), "paused");
         assert_eq!(
-            AutomationStatus::from_str("paused"),
+            AutomationStatus::from_str("paused").unwrap(),
             AutomationStatus::Paused
         );
         assert_eq!(
-            AutomationStatus::from_str("unknown"),
+            AutomationStatus::from_str("unknown").unwrap(),
             AutomationStatus::Active
         );
     }

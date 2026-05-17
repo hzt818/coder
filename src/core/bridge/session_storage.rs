@@ -28,6 +28,12 @@ impl SessionStorageBridgeState {
     }
 }
 
+impl Default for SessionStorageBridgeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn get_state() -> &'static RwLock<SessionStorageBridgeState> {
     SESSION_STORAGE_BRIDGE.get_or_init(|| RwLock::new(SessionStorageBridgeState::new()))
 }

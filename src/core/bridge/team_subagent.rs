@@ -42,6 +42,12 @@ impl TeamSubagentBridgeState {
     }
 }
 
+impl Default for TeamSubagentBridgeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn get_state() -> &'static RwLock<TeamSubagentBridgeState> {
     TEAM_SUBAGENT_BRIDGE.get_or_init(|| RwLock::new(TeamSubagentBridgeState::new()))
 }

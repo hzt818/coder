@@ -40,6 +40,12 @@ impl ToolSkillBridgeState {
     }
 }
 
+impl Default for ToolSkillBridgeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn get_state() -> &'static RwLock<ToolSkillBridgeState> {
     TOOL_SKILL_BRIDGE.get_or_init(|| RwLock::new(ToolSkillBridgeState::new()))
 }

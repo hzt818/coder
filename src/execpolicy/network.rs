@@ -441,7 +441,7 @@ mod tests {
     }
     #[test]
     fn session_cache_short_circuits() {
-        let mut d = NetworkPolicyDecider::new(mk(Decision::Prompt, &[], &[]), None);
+        let d = NetworkPolicyDecider::new(mk(Decision::Prompt, &[], &[]), None);
         assert_eq!(d.evaluate("api.example.com", "fetch"), Decision::Prompt);
         d.approve_session("api.example.com", "fetch");
         assert_eq!(d.evaluate("api.example.com", "fetch"), Decision::Allow);

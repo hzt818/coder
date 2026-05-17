@@ -151,7 +151,7 @@ mod tests {
     #[test]
     fn test_json_error_pos() {
         let e = serde_json::from_str::<serde_json::Value>("{invalid}").unwrap_err();
-        let (line, col) = extract_json_error_pos(&e);
+        let (line, _col) = extract_json_error_pos(&e);
         assert!(line >= 1);
     }
 }

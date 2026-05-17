@@ -50,7 +50,7 @@ pub fn search_sessions(query: &str, max_results: usize) -> Vec<SessionSearchResu
     }
 
     // Sort by match relevance
-    results.sort_by(|a, b| b.match_count.cmp(&a.match_count));
+    results.sort_by_key(|r| std::cmp::Reverse(r.match_count));
     results.truncate(max_results);
     results
 }

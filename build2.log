@@ -1,0 +1,8 @@
+error: failed to select a version for `reqwest-eventsource`.
+    ... required by package `coder v0.1.0 (/mnt/d/Coder/coder)`
+versions that meet the requirements `^0.6` (locked to 0.6.0) are: 0.6.0
+
+package `coder` depends on `reqwest-eventsource` with feature `rustls-tls` but `reqwest-eventsource` does not have that feature.
+
+
+failed to select a version for `reqwest-eventsource` which could resolve this conflict

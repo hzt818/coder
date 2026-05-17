@@ -168,7 +168,7 @@ impl ExecPolicyEngine {
     pub fn add_ruleset(&mut self, ruleset: Ruleset) {
         self.rulesets.push(ruleset);
         // Sort by layer priority (highest first for deny-wins)
-        self.rulesets.sort_by(|a, b| b.layer.cmp(&a.layer));
+        self.rulesets.sort_by_key(|r| std::cmp::Reverse(r.layer));
     }
 
     /// Add a user ruleset

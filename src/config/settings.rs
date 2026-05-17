@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use super::provider_config::ProviderConfig;
 
 /// Top-level settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Settings {
     /// AI-related configuration
@@ -19,18 +19,6 @@ pub struct Settings {
     pub session: SessionSettings,
     /// Storage configuration
     pub storage: StorageSettings,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            ai: AiSettings::default(),
-            ui: UiSettings::default(),
-            tools: ToolSettings::default(),
-            session: SessionSettings::default(),
-            storage: StorageSettings::default(),
-        }
-    }
 }
 
 impl Settings {
