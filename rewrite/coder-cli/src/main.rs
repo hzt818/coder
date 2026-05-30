@@ -40,6 +40,8 @@ fn load_api_key(args: &Args) -> Option<String> {
     None
 }
 
+use coder_ai::Provider;
+
 #[tokio::main]
 async fn main() {
     let _ = env_logger::try_init();
@@ -66,7 +68,7 @@ async fn main() {
     // Create provider and, if a message was provided, request a completion.
     let provider = coder_ai::OpenAIProvider::new(api_key.clone(), None, None);
     if !args.message.is_empty() {
-        match provider.complete(&args.message).await {
+        match Provider::complete(&provider, &args.message).await {
             Ok(c) => println!("Completion: {}", c),
             Err(e) => eprintln!("Completion error: {}", e),
         }

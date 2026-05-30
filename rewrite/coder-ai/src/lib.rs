@@ -25,8 +25,13 @@ pub struct OpenAIProvider {
 
 impl OpenAIProvider {
     pub fn new(api_key: Option<String>, base_url: Option<&str>, model: Option<&str>) -> Self {
+        OpenAIProvider::new_with_client(Client::new(), api_key, base_url, model)
+    }
+
+    /// Create a provider with an injected reqwest::Client (useful for tests)
+    pub fn new_with_client(client: Client, api_key: Option<String>, base_url: Option<&str>, model: Option<&str>) -> Self {
         OpenAIProvider {
-            client: Client::new(),
+            client,
             api_key,
             base_url: base_url.unwrap_or("https://api.openai.com/v1").to_string(),
             model: model.unwrap_or("gpt-3.5-turbo").to_string(),
@@ -103,11 +108,37 @@ impl Provider for OpenAIProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use httpmock::prelude::*;
 
     #[tokio::test]
     async fn openai_provider_mock_when_no_key() {
         let p = OpenAIProvider::new(None, None, None);
         let out = p.complete("hello").await.unwrap();
         assert_eq!(out, "openai-mock: hello");
+    }
+
+    #[tokio::test]
+    async fn openai_provider_calls_api() {
+        // start a mock server
+        let server = MockServer::start();
+
+        // Expected response body matching ChatResponse structure
+        let body = r#"{"choices":[{"message":{"content":"hello-response"}}]}"#;
+
+        let mock = server.mock(|when, then| {
+            when.method(POST)
+                .path("/chat/completions");
+            then.status(200)
+                .header("content-type", "application/json")
+                .body(body);
+        });
+
+        let client = reqwest::Client::new();
+        let base = server.url("/");
+        let p = OpenAIProvider::new_with_client(client, Some("testkey".to_string()), Some(&base), Some("gpt-test"));
+        let out = p.complete("input prompt").await.unwrap();
+        assert_eq!(out, "hello-response");
+
+        mock.assert();
     }
 }
