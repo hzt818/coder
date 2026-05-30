@@ -1,10 +1,6 @@
 /// coder-core: core runtime primitives (minimal)
 
-pub mod context;
-pub mod context_sqlite;
-use std::sync::Arc;
-
-pub type SharedContext = Arc<dyn crate::context::ContextStore>;
+use coder_context::{Context, SqliteContext, SharedContext, ContextStore};
 
 use crate::agent::Agent;
 
@@ -12,7 +8,7 @@ pub mod agent {
     use async_trait::async_trait;
     use crate::provider::Provider;
     use crate::tool::Tool;
-    use crate::SharedContext;
+    use coder_context::SharedContext;
     use anyhow::Result;
 
     #[async_trait]
@@ -63,8 +59,8 @@ mod tests {
     use async_trait::async_trait;
     use crate::provider::Provider;
     use crate::tool::Tool;
-    use crate::context::Context;
-    use crate::context::ContextStore;
+    use coder_context::Context;
+    use coder_context::ContextStore;
     use std::sync::Arc;
 
     struct MockProv;
@@ -84,7 +80,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple_agent_runs() {
-        let ctx: Arc<dyn crate::context::ContextStore> = Arc::new(Context::new());
+        let ctx: coder_context::SharedContext = Arc::new(Context::new());
         let agent = SimpleAgent { provider: MockProv, tool: EchoTool, context: ctx };
         let out = Agent::run(&agent, "hello").await.unwrap();
         assert_eq!(out, "tool:prov:hello");

@@ -218,13 +218,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "coder-context"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "rusqlite",
+ "tokio",
+]
+
+[[package]]
 name = "coder-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "coder-context",
  "coder-tools",
- "rusqlite",
  "tokio",
 ]
 

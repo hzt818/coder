@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use crate::context_sqlite::SqliteContext;
-    use crate::SharedContext;
+    use coder_context::SqliteContext;
+    use coder_context::SharedContext;
     use crate::agent::SimpleAgent;
     use crate::provider::Provider;
     use crate::tool::Tool;
