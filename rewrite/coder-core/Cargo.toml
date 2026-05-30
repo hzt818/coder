@@ -9,4 +9,5 @@ async-trait = "0.1"
 anyhow = "1"
 coder-tools = { path = "../coder-tools" }
 coder-context = { path = "../coder-context" }
+coder-ai = { path = "../coder-ai" }
 

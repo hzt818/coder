@@ -37,11 +37,7 @@ pub mod agent {
 }
 
 pub mod provider {
-    use async_trait::async_trait;
-    #[async_trait]
-    pub trait Provider: Send + Sync {
-        async fn complete(&self, prompt: &str) -> anyhow::Result<String>;
-    }
+    pub use coder_ai::Provider;
 }
 
 pub mod tool {

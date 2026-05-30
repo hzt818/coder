@@ -233,6 +233,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "coder-ai",
  "coder-context",
  "coder-tools",
  "tokio",
