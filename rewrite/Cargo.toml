@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "coder-core",
+  "coder-cli",
+  "coder-tui",
+  "coder-ai",
+  "coder-tools",
+  "coder-storage",
+]
