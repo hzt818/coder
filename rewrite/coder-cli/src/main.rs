@@ -50,7 +50,8 @@ async fn main() {
         println!("Message: {}", args.message);
     }
 
-    match load_api_key(&args) {
+    let api_key = load_api_key(&args);
+    match api_key.clone() {
         Some(k) => {
             let masked = if k.len() > 8 {
                 format!("{}***{}", &k[..4], &k[k.len()-4..])
@@ -60,6 +61,15 @@ async fn main() {
             println!("API key: {}", masked);
         }
         None => println!("API key: not configured (set CODER_API_KEY or --api-key or use config file)"),
+    }
+
+    // Create provider and, if a message was provided, request a completion.
+    let provider = coder_ai::OpenAIProvider::new(api_key.clone(), None, None);
+    if !args.message.is_empty() {
+        match provider.complete(&args.message).await {
+            Ok(c) => println!("Completion: {}", c),
+            Err(e) => eprintln!("Completion error: {}", e),
+        }
     }
 }
 

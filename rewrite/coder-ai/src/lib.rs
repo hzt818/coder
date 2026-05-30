@@ -67,9 +67,14 @@ impl Provider for OpenAIProvider {
     async fn complete(&self, prompt: &str) -> Result<String> {
         // If no API key configured, return deterministic mock response for tests
         let api_key = match &self.api_key {
-            Some(k) if !k.is_empty() => k,
-            _ => return Ok(format!("openai-mock: {}", prompt)),
+            Some(k) if !k.is_empty() => Some(k.clone()),
+            _ => None,
         };
+
+        if api_key.is_none() {
+            return Ok(format!("openai-mock: {}", prompt));
+        }
+        let api_key = api_key.unwrap();
 
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
         let body = ChatRequest {
@@ -91,5 +96,18 @@ impl Provider for OpenAIProvider {
             return Err(anyhow!("no choices in response"));
         }
         Ok(jr.choices[0].message.content.clone())
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn openai_provider_mock_when_no_key() {
+        let p = OpenAIProvider::new(None, None, None);
+        let out = p.complete("hello").await.unwrap();
+        assert_eq!(out, "openai-mock: hello");
     }
 }
