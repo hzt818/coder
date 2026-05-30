@@ -36,3 +36,7 @@ impl ToolRegistry {
         r.get(name).cloned()
     }
 }
+
+impl Default for ToolRegistry {
+    fn default() -> Self { Self::new() }
+}

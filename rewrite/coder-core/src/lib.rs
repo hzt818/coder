@@ -1,8 +1,5 @@
-/// coder-core: core runtime primitives (minimal)
-
-use coder_context::{Context, SqliteContext, SharedContext, ContextStore};
-
-use crate::agent::Agent;
+//! coder-core: core runtime primitives (minimal)
+// Use coder_context types where needed inside modules to avoid unused-import warnings.
 
 pub mod agent {
     use async_trait::async_trait;
@@ -49,6 +46,11 @@ pub mod tool {
     }
 }
 
+pub async fn start() -> &'static str {
+    // placeholder for agent loop
+    "coder-core started"
+}
+
 #[cfg(test)]
 mod tests {
     use super::agent::{Agent, SimpleAgent};
@@ -56,7 +58,6 @@ mod tests {
     use crate::provider::Provider;
     use crate::tool::Tool;
     use coder_context::Context;
-    use coder_context::ContextStore;
     use std::sync::Arc;
 
     struct MockProv;
@@ -81,9 +82,4 @@ mod tests {
         let out = Agent::run(&agent, "hello").await.unwrap();
         assert_eq!(out, "tool:prov:hello");
     }
-}
-
-pub async fn start() -> &'static str {
-    // placeholder for agent loop
-    "coder-core started"
 }

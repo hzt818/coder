@@ -81,9 +81,9 @@ impl SqliteContext {
         let conn = Arc::clone(&self.conn);
         task::spawn_blocking(move || {
             let conn = conn.lock().unwrap();
-            let mut stmt = conn.prepare("SELECT message FROM messages ORDER BY id DESC LIMIT ?1")?;
+                    let mut stmt = conn.prepare("SELECT message FROM messages ORDER BY id DESC LIMIT ?1")?;
             let rows = stmt
-                .query_map(params![n as i64], |row| Ok(row.get::<_, String>(0)?))?
+                .query_map(params![n as i64], |row| row.get::<_, String>(0))?
                 .collect::<Result<Vec<String>, rusqlite::Error>>()?;
             let mut v = rows;
             v.reverse();
@@ -101,10 +101,7 @@ impl ContextStore for SqliteContext {
     }
 
     async fn recent(&self, n: usize) -> Vec<String> {
-        match self.recent(n).await {
-            Ok(v) => v,
-            Err(_) => vec![],
-        }
+        SqliteContext::recent(self, n).await.unwrap_or_default()
     }
 }
 
