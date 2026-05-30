@@ -1,31 +1,40 @@
 /// coder-core: core runtime primitives (minimal)
 
+pub mod context;
+pub mod context_sqlite;
+use std::sync::Arc;
+
+pub type SharedContext = Arc<dyn crate::context::ContextStore>;
+
 use crate::agent::Agent;
 
 pub mod agent {
     use async_trait::async_trait;
     use crate::provider::Provider;
     use crate::tool::Tool;
+    use crate::SharedContext;
+    use anyhow::Result;
 
     #[async_trait]
     pub trait Agent: Send + Sync {
-        async fn run(&self, input: &str) -> anyhow::Result<String>;
+        async fn run(&self, input: &str) -> Result<String>;
     }
 
-    pub struct SimpleAgent<P: Provider, T: Tool> {
+    pub struct SimpleAgent<P: Provider + Send + Sync, T: Tool + Send + Sync> {
         pub provider: P,
         pub tool: T,
+        pub context: SharedContext,
     }
 
     #[async_trait]
-    impl<P: Provider, T: Tool> Agent for SimpleAgent<P, T>
-    where
-        P: Provider + Send + Sync,
-        T: Tool + Send + Sync,
+    impl<P: Provider + Send + Sync, T: Tool + Send + Sync> Agent for SimpleAgent<P, T>
     {
-        async fn run(&self, input: &str) -> anyhow::Result<String> {
+        async fn run(&self, input: &str) -> Result<String> {
+            self.context.push(format!("input: {}", input)).await;
             let completion = self.provider.complete(input).await?;
+            self.context.push(format!("provider: {}", completion)).await;
             let tool_out = self.tool.run(&completion).await?;
+            self.context.push(format!("tool: {}", tool_out)).await;
             Ok(tool_out)
         }
     }
@@ -54,6 +63,9 @@ mod tests {
     use async_trait::async_trait;
     use crate::provider::Provider;
     use crate::tool::Tool;
+    use crate::context::Context;
+    use crate::context::ContextStore;
+    use std::sync::Arc;
 
     struct MockProv;
     #[async_trait]
@@ -72,8 +84,8 @@ mod tests {
 
     #[tokio::test]
     async fn simple_agent_runs() {
-        let agent = SimpleAgent { provider: MockProv, tool: EchoTool };
-        // Agent trait is in scope, so run() is available
+        let ctx: Arc<dyn crate::context::ContextStore> = Arc::new(Context::new());
+        let agent = SimpleAgent { provider: MockProv, tool: EchoTool, context: ctx };
         let out = Agent::run(&agent, "hello").await.unwrap();
         assert_eq!(out, "tool:prov:hello");
     }
