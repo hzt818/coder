@@ -1,0 +1,1 @@
+D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\target\debug\libcoder_tui.rlib: D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\coder-tui\src\lib.rs

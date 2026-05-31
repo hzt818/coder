@@ -1,0 +1,1 @@
+D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\target\debug\coder-cli.exe: D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\coder-cli\src\main.rs D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\coder-core\src\lib.rs

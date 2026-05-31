@@ -1,0 +1,14 @@
+[package]
+name = "coder-context"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "coder_context"
+path = "src/lib.rs"
+
+[dependencies]
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+rusqlite = { version = "0.29", features = ["bundled"] }
+anyhow = "1"

@@ -1,0 +1,13 @@
+[package]
+name = "coder-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.40", features = ["full"] }
+async-trait = "0.1"
+anyhow = "1"
+coder-tools = { path = "../coder-tools" }
+coder-context = { path = "../coder-context" }
+coder-ai = { path = "../coder-ai" }
+

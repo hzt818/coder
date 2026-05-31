@@ -1,0 +1,9 @@
+[package]
+name = "coder-tools"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1"
+anyhow = "1"
+tokio = { version = "1.40", features = ["sync"] }
