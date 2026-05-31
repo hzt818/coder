@@ -6,6 +6,7 @@ use super::{AudioConfig, AudioFormat, VoiceError, VoiceResult};
 
 /// Plays audio through speakers or output devices
 #[derive(Debug)]
+#[derive(Default)]
 pub struct AudioOutput {
     /// Audio configuration
     config: AudioConfig,
@@ -13,14 +14,6 @@ pub struct AudioOutput {
     device_name: Option<String>,
 }
 
-impl Default for AudioOutput {
-    fn default() -> Self {
-        Self {
-            config: AudioConfig::default(),
-            device_name: None,
-        }
-    }
-}
 
 impl AudioOutput {
     /// Create a new AudioOutput with default configuration

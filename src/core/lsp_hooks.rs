@@ -49,8 +49,8 @@ impl DiagnosticSeverity {
 }
 
 /// Run LSP diagnostics for edited files after a tool execution
-pub async fn run_post_edit_lsp<'a>(
-    edited_files: &[&'a Path],
+pub async fn run_post_edit_lsp(
+    edited_files: &[&Path],
     lsp_clients: &[Arc<LspClient>],
 ) -> Vec<DiagnosticResult> {
     let mut all_diagnostics = Vec::new();

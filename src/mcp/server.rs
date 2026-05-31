@@ -13,6 +13,7 @@ use crate::tool::ToolRegistry;
 pub struct McpServer {
     registry: Arc<ToolRegistry>,
     running: Arc<std::sync::atomic::AtomicBool>,
+    #[allow(dead_code)]
     next_id: Arc<std::sync::atomic::AtomicU64>,
 }
 

@@ -8,6 +8,7 @@ pub mod agent;
 pub mod ai;
 pub mod commands;
 pub mod config;
+pub mod context;
 pub mod core;
 pub mod execpolicy;
 pub mod i18n;

@@ -8,11 +8,15 @@ use async_trait::async_trait;
 use futures::StreamExt;
 
 /// OpenAI-compatible provider
+///
+/// Supports: OpenAI, DeepSeek, Ollama, MiniMax, Groq, and any OpenAI-compatible API.
+/// When no API key is configured, returns deterministic mock responses (useful for testing).
 #[derive(Debug)]
 pub struct OpenAIProvider {
     api_key: String,
     base_url: String,
     model: String,
+    client: reqwest::Client,
 }
 
 impl OpenAIProvider {
@@ -27,7 +31,36 @@ impl OpenAIProvider {
             api_key,
             base_url,
             model,
+            client: crate::ai::build_http_client(),
         }
+    }
+
+    /// Create a provider with an injected `reqwest::Client`.
+    ///
+    /// Useful for tests using `httpmock` or other mock HTTP servers.
+    pub fn new_with_client(
+        client: reqwest::Client,
+        api_key: String,
+        base_url: String,
+        model: String,
+    ) -> Self {
+        let base_url = if base_url.is_empty() {
+            "https://api.openai.com/v1".to_string()
+        } else {
+            base_url.trim_end_matches('/').to_string()
+        };
+
+        Self {
+            api_key,
+            base_url,
+            model,
+            client,
+        }
+    }
+
+    /// Returns `true` when no real API key is configured (empty or all-whitespace).
+    fn has_no_api_key(&self) -> bool {
+        self.api_key.trim().is_empty()
     }
 
     /// Build the request body for the chat completions API
@@ -92,10 +125,35 @@ impl Provider for OpenAIProvider {
     ) -> anyhow::Result<StreamHandler> {
         let (tx, rx) = tokio::sync::mpsc::channel(256);
 
-        let client = crate::ai::build_http_client();
+        // When no API key is configured, return a deterministic mock response.
+        // This keeps the binary runnable for testing without real credentials.
+        if self.has_no_api_key() {
+            let prompt = messages
+                .iter()
+                .filter_map(|m| m.content.first())
+                .filter_map(|c| match c {
+                    ContentBlock::Text { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let mock = format!("mocked-openai-response to: {}", &prompt[..prompt.len().min(120)]);
+            tokio::spawn(async move {
+                tx.send(StreamEvent::TextChunk(mock)).await.ok();
+                tx.send(StreamEvent::Done {
+                    stop_reason: "stop".to_string(),
+                    usage: None,
+                })
+                .await
+                .ok();
+            });
+            return Ok(rx);
+        }
+
         let request_body = self.build_request(messages, tools, config);
 
-        let request = client
+        let request = self
+            .client
             .post(format!("{}/chat/completions", self.base_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -269,5 +327,65 @@ pub async fn process_sse_data(
                 }))
                 .await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn openai_provider_mock_when_no_key() {
+        let p = OpenAIProvider::new("".to_string(), "".to_string(), "gpt-test".to_string());
+        assert!(p.has_no_api_key());
+
+        let msgs = vec![Message::user("hello")];
+        let mut stream = p.chat_stream(&msgs, &[], &GenerateConfig::default()).await.unwrap();
+
+        let mut got_text = String::new();
+        while let Some(event) = stream.recv().await {
+            if let StreamEvent::TextChunk(t) = event {
+                got_text.push_str(&t);
+            }
+        }
+        assert!(got_text.contains("mocked-openai-response"));
+    }
+
+    #[tokio::test]
+    async fn openai_provider_calls_mock_server() {
+        let server = httpmock::MockServer::start();
+        // SSE-style response: each line is a "data: <json>" event, terminated by [DONE]
+        let sse_body = "data: {\"choices\":[{\"delta\":{\"content\":\"hello-response\"},\"index\":0}]}\n\ndata: [DONE]\n\n";
+
+        let mock = server.mock(|when, then| {
+            when.method(httpmock::Method::POST)
+                .path("/chat/completions");
+            then.status(200)
+                .header("content-type", "text/event-stream")
+                .body(sse_body);
+        });
+
+        let client = reqwest::Client::new();
+        let base = server.url("/");
+        let p = OpenAIProvider::new_with_client(
+            client,
+            "testkey".to_string(),
+            base,
+            "gpt-test".to_string(),
+        );
+
+        let msgs = vec![Message::user("input prompt")];
+        let mut stream = p.chat_stream(&msgs, &[], &GenerateConfig::default()).await.unwrap();
+
+        let mut got_text = String::new();
+        while let Some(event) = stream.recv().await {
+            match event {
+                StreamEvent::TextChunk(t) => got_text.push_str(&t),
+                StreamEvent::Done { .. } => break,
+                _ => {}
+            }
+        }
+        assert!(got_text.contains("hello-response"), "got: {}", got_text);
+        mock.assert();
     }
 }

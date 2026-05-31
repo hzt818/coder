@@ -82,7 +82,7 @@ impl Skill for PlanSkill {
             plan.push_str("- [ ] Document edge cases and error scenarios\n");
             plan.push_str("- [ ] Define performance requirements\n");
         }
-        plan.push_str("\n");
+        plan.push('\n');
 
         // Phase 2: Design
         plan.push_str("## Phase 2: Design\n\n");
@@ -94,7 +94,7 @@ impl Skill for PlanSkill {
             plan.push_str("- [ ] Security review of the design\n");
             plan.push_str("- [ ] Create technical specification document\n");
         }
-        plan.push_str("\n");
+        plan.push('\n');
 
         // Phase 3: Implementation
         plan.push_str("## Phase 3: Implementation\n\n");
@@ -109,7 +109,7 @@ impl Skill for PlanSkill {
             plan.push_str("- [ ] Performance benchmarks\n");
             plan.push_str("- [ ] Documentation of implementation details\n");
         }
-        plan.push_str("\n");
+        plan.push('\n');
 
         // Phase 4: Review & Quality
         plan.push_str("## Phase 4: Review & Quality\n\n");
@@ -117,7 +117,7 @@ impl Skill for PlanSkill {
         plan.push_str("- [ ] Static analysis / linting\n");
         plan.push_str("- [ ] Security audit\n");
         plan.push_str("- [ ] Documentation update\n");
-        plan.push_str("\n");
+        plan.push('\n');
 
         // Phase 5: Deployment
         plan.push_str("## Phase 5: Deployment\n\n");
@@ -125,7 +125,7 @@ impl Skill for PlanSkill {
         plan.push_str("- [ ] Staging deployment and validation\n");
         plan.push_str("- [ ] Production deployment\n");
         plan.push_str("- [ ] Monitoring and rollback plan\n");
-        plan.push_str("\n");
+        plan.push('\n');
 
         // Dependencies table
         plan.push_str("## Dependencies\n\n");

@@ -9,21 +9,15 @@ use super::{AudioConfig, VoiceError, VoiceResult};
 
 /// Records audio from a microphone device
 #[derive(Debug)]
+#[derive(Default)]
 pub struct AudioInput {
     /// Audio configuration
+    #[allow(dead_code)]
     config: AudioConfig,
     /// Name of the input device (None = default)
     device_name: Option<String>,
 }
 
-impl Default for AudioInput {
-    fn default() -> Self {
-        Self {
-            config: AudioConfig::default(),
-            device_name: None,
-        }
-    }
-}
 
 impl AudioInput {
     /// Create a new AudioInput with default configuration

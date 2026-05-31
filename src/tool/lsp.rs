@@ -207,7 +207,7 @@ impl LspTool {
                                 }
                             }
                             "find_references" => {
-                                let refs = value.as_array().map(|a| a.clone()).unwrap_or_default();
+                                let refs = value.as_array().cloned().unwrap_or_default();
                                 if refs.is_empty() {
                                     "No references found.".to_string()
                                 } else {
@@ -271,7 +271,7 @@ impl LspTool {
                         {
                             Ok(value) => {
                                 let symbols =
-                                    value.as_array().map(|a| a.clone()).unwrap_or_default();
+                                    value.as_array().cloned().unwrap_or_default();
                                 if symbols.is_empty() {
                                     ToolResult::ok("No symbols found.")
                                 } else {
@@ -315,7 +315,7 @@ impl LspTool {
                             .send_request("workspace/symbol", serde_json::json!({"query": query}))
                             .await
                         {
-                            let symbols = result.as_array().map(|a| a.clone()).unwrap_or_default();
+                            let symbols = result.as_array().cloned().unwrap_or_default();
                             for sym in &symbols {
                                 let name = sym.get("name").and_then(|n| n.as_str()).unwrap_or("?");
                                 let container = sym
@@ -366,8 +366,7 @@ impl LspTool {
                         {
                             Ok(items) => {
                                 let items = items
-                                    .as_array()
-                                    .map(|a| a.clone())
+                                    .as_array().cloned()
                                     .unwrap_or_else(|| vec![items.clone()]);
                                 let mut out = format!(
                                     "── Call Hierarchy at {}:{}:{} ──\n",

@@ -1,0 +1,263 @@
+warning: field `next_id` is never read
+  --> src\mcp\server.rs:16:5
+   |
+13 | pub struct McpServer {
+   |            --------- field in this struct
+...
+16 |     next_id: Arc<std::sync::atomic::AtomicU64>,
+   |     ^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `session_id` is never read
+  --> src\server\ws.rs:35:5
+   |
+29 | struct WsIncoming {
+   |        ---------- field in this struct
+...
+35 |     session_id: String,
+   |     ^^^^^^^^^^
+   |
+   = note: `WsIncoming` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `config` is never read
+  --> src\voice\input.rs:15:5
+   |
+13 | pub struct AudioInput {
+   |            ---------- field in this struct
+14 |     /// Audio configuration
+15 |     config: AudioConfig,
+   |     ^^^^^^
+   |
+   = note: `AudioInput` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: match expression looks like `matches!` macro
+   --> src\core\features.rs:134:5
+    |
+134 | /     match name {
+135 | |         "ai-openai" => cfg!(feature = "ai-openai"),
+136 | |         "ai-anthropic" => cfg!(feature = "ai-anthropic"),
+137 | |         "ai-google" => cfg!(feature = "ai-google"),
+...   |
+158 | |         _ => false,
+159 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#match_like_matches_macro
+    = note: `#[warn(clippy::match_like_matches_macro)]` on by default
+help: use `matches!` directly
+    |
+134 -     match name {
+135 -         "ai-openai" => cfg!(feature = "ai-openai"),
+136 -         "ai-anthropic" => cfg!(feature = "ai-anthropic"),
+137 -         "ai-google" => cfg!(feature = "ai-google"),
+138 -         "ai-opencode" => cfg!(feature = "ai-opencode"),
+139 -         "tools-git" => cfg!(feature = "tools-git"),
+140 -         "tools-docker" => cfg!(feature = "tools-docker"),
+141 -         "tools-db" => cfg!(feature = "tools-db"),
+142 -         "tools-oauth" => cfg!(feature = "tools-oauth"),
+143 -         "team" => cfg!(feature = "team"),
+144 -         "skill" => cfg!(feature = "skill"),
+145 -         "subagent" => cfg!(feature = "subagent"),
+146 -         "memory" => cfg!(feature = "memory"),
+147 -         "storage" => cfg!(feature = "storage"),
+148 -         "server" => cfg!(feature = "server"),
+149 -         "mcp" => cfg!(feature = "mcp"),
+150 -         "lsp" => cfg!(feature = "lsp"),
+151 -         "oauth" => cfg!(feature = "oauth"),
+152 -         "analytics" => cfg!(feature = "analytics"),
+153 -         "permission" => cfg!(feature = "permission"),
+154 -         "computer" => cfg!(feature = "computer"),
+155 -         "worktree" => cfg!(feature = "worktree"),
+156 -         "voice" => cfg!(feature = "voice"),
+157 -         "sync" => cfg!(feature = "sync"),
+158 -         _ => false,
+159 -     }
+134 +     matches!(name, "ai-openai" | "ai-anthropic" | "ai-google" | "ai-opencode" | "tools-git" | "tools-docker" | "tools-db" | "tools-oauth" | "team" | "skill" | "subagent" | "memory" | "storage" | "server" | "mcp" | "lsp" | "oauth" | "analytics" | "permission" | "computer" | "worktree" | "voice" | "sync")
+    |
+
+warning: the following explicit lifetimes could be elided: 'a
+  --> src\core\lsp_hooks.rs:52:32
+   |
+52 | pub async fn run_post_edit_lsp<'a>(
+   |                                ^^
+53 |     edited_files: &[&'a Path],
+   |                      ^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_lifetimes
+   = note: `#[warn(clippy::needless_lifetimes)]` on by default
+
+warning: match can be simplified with `.unwrap_or_default()`
+   --> src\tool\git.rs:123:26
+    |
+123 |       let status_verbose = match run_git_command(repo_path, &["status"]).await {
+    |  __________________________^
+124 | |         Ok(s) => s,
+125 | |         Err(_) => String::new(),
+126 | |     };
+    | |_____^ help: ascribe the type std::string::String and replace your expression with: `run_git_command(repo_path, &["status"]).await.unwrap_or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_unwrap_or_default
+    = note: `#[warn(clippy::manual_unwrap_or_default)]` on by default
+
+warning: stripping a prefix manually
+   --> src\tool\git.rs:279:55
+    |
+279 |             summary.push_str(&format!("Author: {}\n", &line[7..]));
+    |                                                       ^^^^^^^^^^
+    |
+note: the prefix was tested here
+   --> src\tool\git.rs:278:9
+    |
+278 |         if line.starts_with("author ") {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_strip
+    = note: `#[warn(clippy::manual_strip)]` on by default
+help: try using the `strip_prefix` method
+    |
+278 ~         if let Some(<stripped>) = line.strip_prefix("author ") {
+279 ~             summary.push_str(&format!("Author: {}\n", <stripped>));
+    |
+
+warning: stripping a prefix manually
+   --> src\tool\git.rs:281:34
+    |
+281 |             let timestamp: i64 = line[12..].parse().unwrap_or(0);
+    |                                  ^^^^^^^^^^
+    |
+note: the prefix was tested here
+   --> src\tool\git.rs:280:16
+    |
+280 |         } else if line.starts_with("author-time ") {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_strip
+help: try using the `strip_prefix` method
+    |
+280 ~         } else if let Some(<stripped>) = line.strip_prefix("author-time ") {
+281 ~             let timestamp: i64 = <stripped>.parse().unwrap_or(0);
+    |
+
+warning: stripping a prefix manually
+   --> src\tool\git.rs:287:56
+    |
+287 |             summary.push_str(&format!("Summary: {}\n", &line[8..]));
+    |                                                        ^^^^^^^^^^
+    |
+note: the prefix was tested here
+   --> src\tool\git.rs:286:16
+    |
+286 |         } else if line.starts_with("summary ") {
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_strip
+help: try using the `strip_prefix` method
+    |
+286 ~         } else if let Some(<stripped>) = line.strip_prefix("summary ") {
+287 ~             summary.push_str(&format!("Summary: {}\n", <stripped>));
+    |
+
+warning: clamp-like pattern without using clamp function
+  --> src\skill\builtin\brainstorm.rs:57:21
+   |
+57 |           let count = input
+   |  _____________________^
+58 | |             .get("count")
+59 | |             .and_then(|v| v.as_i64())
+60 | |             .unwrap_or(5)
+61 | |             .min(20)
+62 | |             .max(1) as usize;
+   | |___________________^
+   |
+   = note: clamp will panic if max < min
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#manual_clamp
+   = note: `#[warn(clippy::manual_clamp)]` on by default
+help: replace with clamp
+   |
+57 ~         let count = input
+58 +             .get("count")
+59 +             .and_then(|v| v.as_i64())
+60 ~             .unwrap_or(5).clamp(1, 20) as usize;
+   |
+
+warning: unnecessary use of `to_string`
+  --> src\skill\builtin\code_review.rs:75:25
+   |
+75 |         review.push_str(&"# Code Review\n\n".to_string());
+   |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `"# Code Review\n\n"`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#unnecessary_to_owned
+   = note: `#[warn(clippy::unnecessary_to_owned)]` on by default
+
+warning: unnecessary use of `to_string`
+   --> src\skill\builtin\debug.rs:153:25
+    |
+153 |         output.push_str(&"# Debug Analysis\n\n".to_string());
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `"# Debug Analysis\n\n"`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#unnecessary_to_owned
+
+warning: you seem to be trying to use `&Box<T>`. Consider using just `&T`
+  --> src\skill\registry.rs:42:45
+   |
+42 |     pub fn get(&self, name: &str) -> Option<&Box<dyn Skill>> {
+   |                                             ^^^^^^^^^^^^^^^ help: try: `&dyn Skill`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#borrowed_box
+   = note: `#[warn(clippy::borrowed_box)]` on by default
+
+warning: `coder` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p coder -- ` to apply 2 suggestions)
+    Checking coder v0.1.0 (D:\Coder\coder)
+warning: unused import: `crate::ai::Role`
+   --> src\subagent\spawn.rs:118:9
+    |
+118 |     use crate::ai::Role;
+    |         ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error: this comparison involving the minimum or maximum element for this type contains a case that is always true or always false
+   --> src\core\bridge\agent_memory.rs:160:17
+    |
+160 |         assert!(get_memory_count() >= 0);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: because `0` is the minimum value for this type, this comparison is always true
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#absurd_extreme_comparisons
+    = note: `#[deny(clippy::absurd_extreme_comparisons)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> src\security\sanitizer.rs:415:9
+    |
+415 |         config.redact_ips = true;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `security::sanitizer::SanitizerConfig { redact_ips: true, ..Default::default() }` and removing relevant reassignments
+   --> src\security\sanitizer.rs:414:9
+    |
+414 |         let mut config = SanitizerConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> src\security\sanitizer.rs:456:9
+    |
+456 |         config.sensitive_fields = vec!["api_key".to_string()];
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `security::sanitizer::SanitizerConfig { sensitive_fields: vec!["api_key".to_string()], ..Default::default() }` and removing relevant reassignments
+   --> src\security\sanitizer.rs:455:9
+    |
+455 |         let mut config = SanitizerConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#field_reassign_with_default
+
+warning: comparison is useless due to type limits
+   --> src\core\bridge\agent_memory.rs:160:17
+    |
+160 |         assert!(get_memory_count() >= 0);
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(unused_comparisons)]` on by default
+
+warning: `coder` (lib test) generated 16 warnings (12 duplicates)
+error: could not compile `coder` (lib test) due to 1 previous error; 16 warnings emitted

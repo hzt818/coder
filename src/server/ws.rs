@@ -32,6 +32,7 @@ struct WsIncoming {
     msg_type: String,
     /// Optional session identifier.
     #[serde(default)]
+    #[allow(dead_code)]
     session_id: String,
     /// Message payload.
     #[serde(default)]
@@ -74,7 +75,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                         let response = handle_message(&text, &tools).await;
                         let json = serde_json::to_string(&response)
                             .unwrap_or_else(|_| r#"{"type":"error","data":"serialization failed"}"#.to_string());
-                        if sender.send(Message::Text(json.into())).await.is_err() {
+                        if sender.send(Message::Text(json)).await.is_err() {
                             break;
                         }
                     }

@@ -150,7 +150,7 @@ impl Skill for DebugSkill {
         let environment = input.get("environment").and_then(|v| v.as_str());
 
         let mut output = String::new();
-        output.push_str(&format!("# Debug Analysis\n\n"));
+        output.push_str("# Debug Analysis\n\n");
         output.push_str(&format!("**Symptom:** {}\n\n", symptom));
         output.push_str("---\n\n");
 
@@ -178,7 +178,7 @@ impl Skill for DebugSkill {
                 h.test
             ));
         }
-        output.push_str("\n");
+        output.push('\n');
 
         // Step 3: Investigate
         output.push_str("## Step 3: Investigate\n\n");
@@ -192,7 +192,7 @@ impl Skill for DebugSkill {
         if error_message.is_some() {
             output.push_str("6. Search for the error message in project issues or documentation\n");
         }
-        output.push_str("\n");
+        output.push('\n');
 
         // Step 4: Fix & verify
         output.push_str("## Step 4: Implement & Verify Fix\n\n");

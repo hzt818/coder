@@ -120,10 +120,7 @@ async fn git_status(repo_path: &str) -> ToolResult {
     }
 
     // Check for ahead/behind
-    let status_verbose = match run_git_command(repo_path, &["status"]).await {
-        Ok(s) => s,
-        Err(_) => String::new(),
-    };
+    let status_verbose = run_git_command(repo_path, &["status"]).await.unwrap_or_default();
     for line in status_verbose.lines() {
         if line.contains("Your branch is ahead of") || line.contains("Your branch is behind") {
             result.push_str(line);
@@ -275,16 +272,16 @@ async fn git_blame(
 
     // Extract key info from porcelain output
     for line in output.lines() {
-        if line.starts_with("author ") {
-            summary.push_str(&format!("Author: {}\n", &line[7..]));
-        } else if line.starts_with("author-time ") {
-            let timestamp: i64 = line[12..].parse().unwrap_or(0);
+        if let Some(author) = line.strip_prefix("author ") {
+            summary.push_str(&format!("Author: {}\n", author));
+        } else if let Some(timestamp_str) = line.strip_prefix("author-time ") {
+            let timestamp: i64 = timestamp_str.parse().unwrap_or(0);
             let naive = chrono::DateTime::from_timestamp(timestamp, 0)
                 .map(|dt| dt.format("%Y-%m-%d").to_string())
                 .unwrap_or_default();
             summary.push_str(&format!("Date: {}\n", naive));
-        } else if line.starts_with("summary ") {
-            summary.push_str(&format!("Summary: {}\n", &line[8..]));
+        } else if let Some(summary_line) = line.strip_prefix("summary ") {
+            summary.push_str(&format!("Summary: {}\n", summary_line));
         } else if line.starts_with('\t') {
             summary.push_str(&format!("  {}\n", line));
         }

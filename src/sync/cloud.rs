@@ -8,6 +8,7 @@ use super::{SyncError, SyncItem, SyncResult, SyncStatus};
 ///
 /// Manages syncing data to and from a remote cloud storage backend.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct CloudSync {
     /// Remote endpoint URL
     endpoint: Option<String>,
@@ -19,16 +20,6 @@ pub struct CloudSync {
     enabled: bool,
 }
 
-impl Default for CloudSync {
-    fn default() -> Self {
-        Self {
-            endpoint: None,
-            auth_token: None,
-            local_store: HashMap::new(),
-            enabled: false,
-        }
-    }
-}
 
 impl CloudSync {
     /// Create a new CloudSync instance

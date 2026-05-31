@@ -411,8 +411,7 @@ mod tests {
 
     #[test]
     fn test_ip_redaction_enabled() {
-        let mut config = SanitizerConfig::default();
-        config.redact_ips = true;
+        let config = SanitizerConfig { redact_ips: true, ..Default::default() };
         let sanitizer = DataSanitizer::new(config);
         assert_eq!(
             sanitizer.sanitize("server at 192.168.1.1"),
@@ -452,8 +451,7 @@ mod tests {
 
     #[test]
     fn test_sensitive_field_case_insensitive() {
-        let mut config = SanitizerConfig::default();
-        config.sensitive_fields = vec!["api_key".to_string()];
+        let config = SanitizerConfig { sensitive_fields: vec!["api_key".to_string()], ..Default::default() };
         let sanitizer = DataSanitizer::new(config);
 
         let json = serde_json::json!({"API_KEY": "secret", "Api_Key": "secret2"});

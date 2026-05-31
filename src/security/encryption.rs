@@ -228,7 +228,7 @@ impl DataCipher {
             .map_err(|e| CryptoError::EncryptFailed(format!("Cannot read source: {}", e)))?;
         let payload = self.encrypt(&data)?;
         let out_path = dst_path.unwrap_or(src_path);
-        std::fs::write(out_path, &payload.data.as_bytes())
+        std::fs::write(out_path, payload.data.as_bytes())
             .map_err(|e| CryptoError::EncryptFailed(format!("Cannot write output: {}", e)))?;
         Ok(())
     }

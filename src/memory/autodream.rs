@@ -141,9 +141,9 @@ impl AutoDream {
         let mut summary = String::with_capacity(target_len + 100);
 
         // Try to end at a sentence boundary for readability
-        if let Some(pos) = truncated.rfind(|c| c == '.' || c == '!' || c == '?') {
+        if let Some(pos) = truncated.rfind(['.', '!', '?']) {
             summary.push_str(&truncated[..=pos]);
-        } else if let Some(pos) = truncated.rfind(|c| c == ',' || c == ';' || c == '\n') {
+        } else if let Some(pos) = truncated.rfind([',', ';', '\n']) {
             summary.push_str(&truncated[..=pos]);
             summary.push_str("...");
         } else {

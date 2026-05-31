@@ -58,8 +58,7 @@ impl Skill for BrainstormSkill {
             .get("count")
             .and_then(|v| v.as_i64())
             .unwrap_or(5)
-            .min(20)
-            .max(1) as usize;
+            .clamp(1, 20) as usize;
 
         let context = input.get("context").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -86,7 +85,7 @@ impl Skill for BrainstormSkill {
                 summary.push_str("   - What constraints or limitations should be considered?\n");
                 summary.push_str("   - What resources or skills are needed?\n");
             }
-            summary.push_str("\n");
+            summary.push('\n');
         }
 
         summary.push_str("## Evaluation Questions\n\n");

@@ -17,6 +17,12 @@ pub struct MemoryBridge {
     session_context: RwLock<String>,
 }
 
+impl Default for MemoryBridge {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryBridge {
     pub fn new() -> Self {
         Self {
@@ -117,6 +123,14 @@ pub fn set_session_context(session_id: &str) {
     get_bridge().set_session_context(session_id)
 }
 
+pub fn get_session_context() -> String {
+    get_bridge().get_session_context()
+}
+
+pub fn get_memory_count() -> usize {
+    get_bridge().get_memory_count()
+}
+
 pub fn enrich_context(base_context: &str, memory_limit: usize) -> String {
     let memories = get_for_context(base_context, memory_limit);
     if memories.is_empty() {
@@ -143,7 +157,8 @@ mod tests {
     #[test]
     fn test_bridge_initialization() {
         init();
-        assert!(get_memory_count() >= 0);
+        // get_memory_count returns usize (always >= 0), so no comparison needed
+        let _ = get_memory_count();
     }
 
     #[test]

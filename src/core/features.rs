@@ -131,32 +131,32 @@ pub fn get_all_features() -> Vec<FeatureStatus> {
 }
 
 pub fn is_feature_enabled(name: &str) -> bool {
-    match name {
-        "ai-openai" => cfg!(feature = "ai-openai"),
-        "ai-anthropic" => cfg!(feature = "ai-anthropic"),
-        "ai-google" => cfg!(feature = "ai-google"),
-        "ai-opencode" => cfg!(feature = "ai-opencode"),
-        "tools-git" => cfg!(feature = "tools-git"),
-        "tools-docker" => cfg!(feature = "tools-docker"),
-        "tools-db" => cfg!(feature = "tools-db"),
-        "tools-oauth" => cfg!(feature = "tools-oauth"),
-        "team" => cfg!(feature = "team"),
-        "skill" => cfg!(feature = "skill"),
-        "subagent" => cfg!(feature = "subagent"),
-        "memory" => cfg!(feature = "memory"),
-        "storage" => cfg!(feature = "storage"),
-        "server" => cfg!(feature = "server"),
-        "mcp" => cfg!(feature = "mcp"),
-        "lsp" => cfg!(feature = "lsp"),
-        "oauth" => cfg!(feature = "oauth"),
-        "analytics" => cfg!(feature = "analytics"),
-        "permission" => cfg!(feature = "permission"),
-        "computer" => cfg!(feature = "computer"),
-        "worktree" => cfg!(feature = "worktree"),
-        "voice" => cfg!(feature = "voice"),
-        "sync" => cfg!(feature = "sync"),
-        _ => false,
-    }
+    matches!(
+        name,
+        "ai-openai"
+            | "ai-anthropic"
+            | "ai-google"
+            | "ai-opencode"
+            | "tools-git"
+            | "tools-docker"
+            | "tools-db"
+            | "tools-oauth"
+            | "team"
+            | "skill"
+            | "subagent"
+            | "memory"
+            | "storage"
+            | "server"
+            | "mcp"
+            | "lsp"
+            | "oauth"
+            | "analytics"
+            | "permission"
+            | "computer"
+            | "worktree"
+            | "voice"
+            | "sync"
+    )
 }
 
 pub fn get_enabled_features() -> Vec<String> {

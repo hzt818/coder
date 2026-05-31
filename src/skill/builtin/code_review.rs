@@ -72,7 +72,7 @@ impl Skill for CodeReviewSkill {
         let git_diff = get_git_diff();
 
         let mut review = String::new();
-        review.push_str(&format!("# Code Review\n\n"));
+        review.push_str("# Code Review\n\n");
         review.push_str(&format!("- **Language:** {}\n", language));
         review.push_str(&format!("- **Focus:** {}\n", focus));
         review.push_str(&format!("- **Lines reviewed:** {}\n\n", line_count));
@@ -131,7 +131,7 @@ impl Skill for CodeReviewSkill {
                 }
             }
 
-            review.push_str("\n");
+            review.push('\n');
         }
 
         // Security analysis
@@ -175,7 +175,7 @@ impl Skill for CodeReviewSkill {
                 );
             }
 
-            review.push_str("\n");
+            review.push('\n');
         }
 
         // Performance analysis
@@ -203,7 +203,7 @@ impl Skill for CodeReviewSkill {
                 );
             }
 
-            review.push_str("\n");
+            review.push('\n');
         }
 
         // Recommendations

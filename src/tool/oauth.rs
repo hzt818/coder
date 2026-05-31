@@ -216,7 +216,7 @@ async fn oauth_authorize(
         url_encode(&resolved_scopes),
     );
 
-    let mut result = format!("OAuth Authorization URL generated:\n\n");
+    let mut result = "OAuth Authorization URL generated:\n\n".to_string();
     result.push_str(&format!(
         "  Provider: {}\n",
         if !provider.is_empty() {
@@ -244,19 +244,19 @@ async fn oauth_token(
     client_id: &str,
     client_secret: &str,
     token_url: &str,
-    redirect_uri: &str,
+    _redirect_uri: &str,
 ) -> ToolResult {
     let (resolved_token_url, resolved_client_id, resolved_client_secret) = if !provider.is_empty() {
         match get_provider_config(provider) {
             Some((_, t, _)) => {
                 let cid = if client_id.is_empty() {
-                    std::env::var(&format!("{}_CLIENT_ID", provider.to_uppercase()))
+                    std::env::var(format!("{}_CLIENT_ID", provider.to_uppercase()))
                         .unwrap_or_default()
                 } else {
                     client_id.to_string()
                 };
                 let cs = if client_secret.is_empty() {
-                    std::env::var(&format!("{}_CLIENT_SECRET", provider.to_uppercase()))
+                    std::env::var(format!("{}_CLIENT_SECRET", provider.to_uppercase()))
                         .unwrap_or_default()
                 } else {
                     client_secret.to_string()

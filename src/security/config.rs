@@ -78,8 +78,10 @@ impl Default for SecurityConfig {
 
 /// Source of the encryption passphrase
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum EncryptionKeySource {
     /// Prompt the user at startup (interactive)
+    #[default]
     Prompt,
     /// Read from an environment variable
     Env(String),
@@ -89,11 +91,6 @@ pub enum EncryptionKeySource {
     MachineKey,
 }
 
-impl Default for EncryptionKeySource {
-    fn default() -> Self {
-        Self::Prompt
-    }
-}
 
 /// Security audit configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

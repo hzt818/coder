@@ -115,8 +115,6 @@ pub fn spawn_subagent(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai::Role;
-
     #[test]
     fn test_spawn_config_default() {
         let config = SpawnConfig::default();

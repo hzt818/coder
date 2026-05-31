@@ -39,8 +39,8 @@ impl SkillRegistry {
     }
 
     /// Get a skill by name
-    pub fn get(&self, name: &str) -> Option<&Box<dyn Skill>> {
-        self.skills.get(name)
+    pub fn get(&self, name: &str) -> Option<&dyn Skill> {
+        self.skills.get(name).map(|s| s.as_ref())
     }
 
     /// Execute a skill by name with the given input
@@ -71,8 +71,8 @@ impl SkillRegistry {
     }
 
     /// Get all skills as an iterator of (name, &Skill) pairs
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &Box<dyn Skill>)> {
-        self.skills.iter().map(|(k, v)| (k.as_str(), v))
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &dyn Skill)> {
+        self.skills.iter().map(|(k, v)| (k.as_str(), v.as_ref()))
     }
 
     /// Discover skills from a directory path (scans for SKILL.md files)

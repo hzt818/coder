@@ -370,13 +370,14 @@ fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyh
         .unwrap_or(toml::Value::Table(toml::value::Table::new()));
 
     {
-        let ai_table = root
-            .as_table_mut()
-            .unwrap()
+        let root_table = root.as_table_mut().ok_or_else(|| {
+            anyhow::anyhow!("Config root is not a table")
+        })?;
+        let ai_table = root_table
             .entry("ai")
             .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
             .as_table_mut()
-            .unwrap();
+            .ok_or_else(|| anyhow::anyhow!("Failed to access [ai] config table"))?;
         ai_table.insert(
             "default_provider".to_string(),
             toml::Value::String("opencode".to_string()),
@@ -386,7 +387,7 @@ fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyh
             .entry("providers")
             .or_insert_with(|| toml::Value::Table(toml::value::Table::new()))
             .as_table_mut()
-            .unwrap();
+            .ok_or_else(|| anyhow::anyhow!("Failed to access [ai.providers] config table"))?;
         providers.insert(
             "opencode".to_string(),
             toml::Value::Table({
@@ -411,6 +412,8 @@ fn save_opencode_config(config: &mut coder::config::Settings, key: &str) -> anyh
         .map_err(|e| anyhow::anyhow!("Failed to write config: {e}"))?;
     tracing::info!("OpenCode config saved to {:?}", config_path);
 
-    *config = coder::config::Settings::load(Some(config_path.to_str().unwrap()))?;
+    *config = coder::config::Settings::load(Some(
+        config_path.to_str().ok_or_else(|| anyhow::anyhow!("Config path is not valid UTF-8"))?,
+    ))?;
     Ok(())
 }
