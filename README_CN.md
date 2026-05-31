@@ -69,19 +69,52 @@ Coder 不把你锁死在某个 AI 厂商。**带上你自己的模型** —— �
 
 ### 🛠️ **真正的工具箱，不只是聊天**
 
-Coder 内置了一整套工具，让 AI **真的能干实事**，而不只是动嘴皮子：
+Coder 内置了 **40+ 个工具**，让 AI **真的能干实事**，而不只是动嘴皮子：
 
+**🖥️ 核心工具**
 | 工具 | 它能干啥 |
 |------|---------|
 | `bash` | 在你的终端里跑命令 |
 | `file_read` / `file_write` / `file_edit` | 读文件、写文件、改文件 |
-| `glob` / `grep` | 找文件、搜代码 |
+| `glob` / `grep` / `list_dir` | 找文件、搜代码、浏览目录 |
 | `web_fetch` / `web_search` | 实时上网搜资料 |
-| `git` | 暂存、提交、对比、推送、创建 PR |
+
+**📐 开发工作流**
+| 工具 | 它能干啥 |
+|------|---------|
+| `plan` / `task` / `checklist` | 任务规划与进度追踪 |
+| `apply_patch` / `fim_edit` | 智能补丁应用与中间补全编辑 |
+| `diagnostics` / `run_tests` | 运行诊断和测试 |
+| `review` / `ci` | 代码审查与 CI 集成 |
+| `git` / `github` / `pr_attempt` | Git 操作、PR 管理 |
+| `recall` | 检索历史会话上下文 |
+
+**⚙️ 基础设施**
+| 工具 | 它能干啥 |
+|------|---------|
 | `docker` | 管理容器 |
 | `db_query` | 查数据库 |
-| `docs` | 查文档 |
-| 还有更多... | 任务管理、写计划、代码审查、CI |
+| `lsp` | 语言服务器协议 — 内联诊断和格式化 |
+| `worktree` | 管理 Git Worktree 实现隔离开发 |
+| `oauth` | OAuth 2.0 认证流程 |
+
+**🤖 自动化与调度**
+| 工具 | 它能干啥 |
+|------|---------|
+| `automation_tool` / `rlm` / `task_gate` | 后台自动化和速率限制执行 |
+| `task_shell` | 持久 Shell 任务，支持超时和重试 |
+| `schedule` / `cron` | 定时重复任务 |
+| `monitor` / `notification` | 资源监控和通知推送 |
+| `remote_trigger` | 远程触发操作 |
+
+**🔌 外部集成**
+| 工具 | 它能干啥 |
+|------|---------|
+| `docs` | 查询库文档 |
+| `finance` | 金融计算和数据处理 |
+| `validate_data` | 根据 Schema 校验数据 |
+| `web_run` | 前端验证沙箱 |
+| `question` | 向你提问，收集需求信息 |
 
 ### 🧠 **三种交互模式，适配你的工作方式**
 
@@ -249,25 +282,37 @@ coder --serve
 ## 🏗️ 架构速览
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   命令行层 (main.rs)                          │
-│         TUI · Headless · Print · API Server                  │
-├─────────────────────────────────────────────────────────────┤
-│                   Agent (ReAct 循环)                         │
-│       ┌──────────┐  ┌──────────┐  ┌──────────────────┐      │
-│       │  Context  │  │ Provider │  │  ToolRegistry    │      │
-│       └──────────┘  └──────────┘  └──────────────────┘      │
-├─────────────────────────────────────────────────────────────┤
-│                   AI 提供商层                                  │
-│   OpenAI  ·  Anthropic  ·  Google  ·  自定义 (你说了算)       │
-├─────────────────────────────────────────────────────────────┤
-│                      工具层                                    │
-│   Bash · 文件操作 · Glob · Grep · 网页 · Git · Docker · 数据库  │
-├─────────────────────────────────────────────────────────────┤
-│          扩展系统 (团队、技能、子 Agent 等)                    │
-├─────────────────────────────────────────────────────────────┤
-│                    存储层 (SQLite)                             │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                       命令行层 (main.rs)                          │
+│            TUI · Headless · Print · API Server (Axum)           │
+├─────────────────────────────────────────────────────────────────┤
+│                       Agent (ReAct 循环)                         │
+│         ┌──────────┐  ┌──────────┐  ┌──────────────────┐        │
+│         │  Context  │  │ Provider │  │  ToolRegistry    │        │
+│         └──────────┘  └──────────┘  └──────────────────┘        │
+├─────────────────────────────────────────────────────────────────┤
+│                      AI 提供商层                                   │
+│      OpenAI · Anthropic · Google · OpenCode · 自定义            │
+├─────────────────────────────────────────────────────────────────┤
+│                        工具层 (40+ 个工具)                        │
+│      核心 · 开发工作流 · 基础设施 · 自动化 · MCP                 │
+├─────────────────────────────────────────────────────────────────┤
+│                     扩展系统 (按特性编译)                          │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  Team    │ │  Skill   │ │Subagent  │ │     MCP/LSP      │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  Memory  │ │  Server  │ │  Voice   │ │   Computer Use   │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  OAuth   │ │  Sync    │ │Worktree  │ │ Security/Analytics│  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+├─────────────────────────────────────────────────────────────────┤
+│                      基础支撑系统                                  │
+│     配置 (TOML) · 会话 · 沙箱 · 执行策略 · 国际化 (i18n)       │
+├─────────────────────────────────────────────────────────────────┤
+│                      存储层 (SQLite/libSQL)                       │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 核心是 **Agent ReAct 循环** —— 它思考、行动、观察，循环往复：
@@ -292,8 +337,8 @@ cargo build --no-default-features --features "ai-openai"
 # 默认构建 — TUI + OpenAI + Anthropic + OpenCode
 cargo build --release
 
-# 全功能构建 — 要啥有啥
-cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,computer,worktree"
+# 全功能构建 — 要啥有啥（加上 `security` 开启加密/密钥链功能）
+cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,security,computer,worktree"
 ```
 
 **特性分组：**
@@ -302,7 +347,7 @@ cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,t
 |------|------|------|
 | **AI 提供商** | `ai-openai`, `ai-anthropic`, `ai-google`, `ai-opencode` | 想支持哪些 AI 后端 |
 | **Phase 1** | `team`, `skill`, `subagent`, `memory`, `storage`, `lsp`, `mcp` | 扩展系统：团队、技能、子 Agent |
-| **Phase 2** | `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `computer`, `worktree` | 高级功能 |
+| **Phase 2** | `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `security`, `computer`, `worktree` | 高级功能（安全审计、桌面操控等） |
 | **额外工具** | `tools-git`, `tools-docker`, `tools-db`, `tools-oauth` | 可选工具集成 |
 
 ### 发布版构建优化
@@ -314,6 +359,32 @@ lto = true           # 链接时优化
 codegen-units = 1    # 更好的内联
 strip = true         # 更小的二进制体积
 ```
+
+---
+
+---
+
+## 🔄 模块化重构
+
+Coder 正在进行**模块化重构** —— 将单体代码库拆分为多个独立、专注的 crate：
+
+```
+coder-core/    — ReAct 循环、Agent 引擎、上下文管理
+coder-cli/     — CLI 参数解析、运行时入口
+coder-tui/     — 终端界面（Ratatui + Crossterm）
+coder-ai/      — AI 提供商抽象层（OpenAI、Anthropic 等）
+coder-tools/   — 工具实现（bash、文件 I/O、git 等）
+coder-storage/ — 持久化层（SQLite、libSQL）
+```
+
+每个 crate 都可独立测试和版本管理。重构代码在 `rewrite/` 目录中，与主二进制并行构建。
+
+```bash
+# 构建重构工作区
+cargo build --workspace --manifest-path rewrite/Cargo.toml
+```
+
+> 💡 过渡期间，`src/` 目录仍是主要构建目标。
 
 ---
 
@@ -367,10 +438,11 @@ coder --serve
 
 | 阶段 | 功能 | 状态 |
 |------|------|------|
-| **核心** | TUI、AI 提供商、工具、Agent 循环 | ✅ 已完成 |
+| **核心** | TUI、AI 提供商、40+ 工具、Agent 循环、配置、会话 | ✅ 已完成 |
 | **Phase 1** | 团队、技能、子 Agent、记忆、存储、LSP、MCP | ✅ 已完成 |
-| **Phase 2** | 服务、权限、同步、语音、OAuth、桌面操控、Worktree | ✅ 已完成 |
-| **Phase 3** | 适配器（Telegram、飞书、Slack）、多模态、插件 | 🚧 计划中 |
+| **Phase 2** | 服务、权限、同步、语音、OAuth、桌面操控、Worktree、安全审计、分析、沙箱、执行策略、国际化 | ✅ 已完成 |
+| **Phase 3** | 适配器（Telegram、飞书）、多模态、插件 | 🚧 进行中 |
+| **重构** | 模块化拆分为独立 crate（core、cli、tui、ai、tools、storage） | 🚧 进行中 |
 
 ---
 

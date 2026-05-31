@@ -69,19 +69,52 @@ Built with [Ratatui](https://github.com/ratatui-org/ratatui), Coder's TUI is des
 
 ### 🛠️ **A Toolbox That Actually Helps**
 
-Coder comes packed with tools that let AI **do** things, not just talk:
+Coder comes packed with **40+ built-in tools** that let AI **do** things, not just talk:
 
+**🖥️ Core**
 | Tool | What It Does |
 |------|-------------|
 | `bash` | Run commands in your terminal |
 | `file_read` / `file_write` / `file_edit` | Read, create, and modify files |
-| `glob` / `grep` | Find files and search code |
+| `glob` / `grep` / `list_dir` | Find files, search code, and explore directories |
 | `web_fetch` / `web_search` | Browse the web in real-time |
-| `git` | Stage, commit, diff, push, create PRs |
+
+**📐 Developer Workflow**
+| Tool | What It Does |
+|------|-------------|
+| `plan` / `task` / `checklist` | Plan tasks and track progress |
+| `apply_patch` / `fim_edit` | Smart patch application and fill-in-the-middle editing |
+| `diagnostics` / `run_tests` | Run diagnostics and execute tests |
+| `review` / `ci` | Code review and CI pipeline integration |
+| `git` / `github` / `pr_attempt` | Stage, commit, diff, push, create PRs |
+| `recall` | Retrieve context from past sessions |
+
+**⚙️ Infrastructure**
+| Tool | What It Does |
+|------|-------------|
 | `docker` | Manage containers |
 | `db_query` | Run database queries |
-| `docs` | Look up documentation |
-| And more... | Task management, planning, code review, CI |
+| `lsp` | Language Server Protocol — inline diagnostics & formatting |
+| `worktree` | Manage git worktrees for isolated development |
+| `oauth` | OAuth 2.0 authentication flow |
+
+**🤖 Automation & Scheduling**
+| Tool | What It Does |
+|------|-------------|
+| `automation_tool` / `rlm` / `task_gate` | Background automation and rate-limited execution |
+| `task_shell` | Run persistent shell tasks with timeout & retry |
+| `schedule` / `cron` | Schedule recurring tasks |
+| `monitor` / `notification` | Monitor resources and send notifications |
+| `remote_trigger` | Trigger actions remotely |
+
+**🔌 Integrations**
+| Tool | What It Does |
+|------|-------------|
+| `docs` | Look up library documentation |
+| `finance` | Financial calculations and data |
+| `validate_data` | Validate data against schemas |
+| `web_run` | Run web sandboxes for front-end validation |
+| `question` | Ask you interactive questions to gather requirements |
 
 ### 🧠 **Smart Interaction Modes**
 
@@ -251,25 +284,37 @@ Type `@` in the input to trigger autocomplete:
 ## 🏗️ Architecture at a Glance
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     CLI Layer (main.rs)                       │
-│         TUI · Headless · Print · API Server                  │
-├─────────────────────────────────────────────────────────────┤
-│                    Agent (ReAct Loop)                        │
-│       ┌──────────┐  ┌──────────┐  ┌──────────────────┐      │
-│       │  Context  │  │ Provider │  │  ToolRegistry    │      │
-│       └──────────┘  └──────────┘  └──────────────────┘      │
-├─────────────────────────────────────────────────────────────┤
-│                   AI Provider Layer                           │
-│   OpenAI  ·  Anthropic  ·  Google  ·  Custom (User-Defined)  │
-├─────────────────────────────────────────────────────────────┤
-│                      Tool Layer                               │
-│   Bash · File I/O · Glob · Grep · Web · Git · Docker · DB   │
-├─────────────────────────────────────────────────────────────┤
-│          Feature Systems (Team, Skill, Subagent, etc.)        │
-├─────────────────────────────────────────────────────────────┤
-│                    Storage Layer (SQLite)                     │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                       CLI Layer (main.rs)                         │
+│           TUI · Headless · Print · API Server (Axum)             │
+├─────────────────────────────────────────────────────────────────┤
+│                      Agent (ReAct Loop)                          │
+│         ┌──────────┐  ┌──────────┐  ┌──────────────────┐        │
+│         │  Context  │  │ Provider │  │  ToolRegistry    │        │
+│         └──────────┘  └──────────┘  └──────────────────┘        │
+├─────────────────────────────────────────────────────────────────┤
+│                     AI Provider Layer                             │
+│     OpenAI · Anthropic · Google · OpenCode · Custom             │
+├─────────────────────────────────────────────────────────────────┤
+│                        Tool Layer (40+ tools)                    │
+│     Core · Dev Workflow · Infrastructure · Automation · MCP     │
+├─────────────────────────────────────────────────────────────────┤
+│                   Feature Systems (Feature-gated)                │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  Team    │ │  Skill   │ │Subagent  │ │     MCP/LSP      │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  Memory  │ │  Server  │ │  Voice   │ │   Computer Use   │   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────────┐   │
+│  │  OAuth   │ │  Sync    │ │Worktree  │ │ Security/Analytics│   │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
+├─────────────────────────────────────────────────────────────────┤
+│                    Foundational Systems                          │
+│  Config (TOML) · Session · Sandbox · ExecPolicy · i18n         │
+├─────────────────────────────────────────────────────────────────┤
+│                     Storage Layer (SQLite/libSQL)                │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 The core is the **Agent ReAct loop** — it thinks, acts, and observes in cycles:
@@ -294,8 +339,8 @@ cargo build --no-default-features --features "ai-openai"
 # Default — TUI + OpenAI + Anthropic + OpenCode
 cargo build --release
 
-# Full — everything
-cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,computer,worktree"
+# Full — everything (add `security` for encryption/keychain features)
+cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,security,computer,worktree"
 ```
 
 **Feature groups:**
@@ -304,7 +349,7 @@ cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,t
 |-------|----------|-------------|
 | **AI Providers** | `ai-openai`, `ai-anthropic`, `ai-google`, `ai-opencode` | Which AI backends to support |
 | **Phase 1** | `team`, `skill`, `subagent`, `memory`, `storage`, `lsp`, `mcp` | Extensions: teams, skills, subagents |
-| **Phase 2** | `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `computer`, `worktree` | Advanced features |
+| **Phase 2** | `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `security`, `computer`, `worktree` | Advanced features (security, analytics, computer use, etc.) |
 | **Extra Tools** | `tools-git`, `tools-docker`, `tools-db`, `tools-oauth` | Optional tool integrations |
 
 ### Release Build Optimizations
@@ -316,6 +361,32 @@ lto = true           # Link-time optimization
 codegen-units = 1    # Better inlining
 strip = true         # Smaller binary
 ```
+
+---
+
+---
+
+## 🔄 Modular Rewrite
+
+Coder is undergoing a **modular rewrite** — decomposing the monolithic codebase into focused, independent crates:
+
+```
+coder-core/    — ReAct loop, agent engine, context management
+coder-cli/     — CLI argument parsing, runtime entry points
+coder-tui/     — Terminal UI (Ratatui + Crossterm)
+coder-ai/      — AI provider abstraction (OpenAI, Anthropic, etc.)
+coder-tools/   — Tool implementations (bash, file I/O, git, etc.)
+coder-storage/ — Persistence layer (SQLite, libSQL)
+```
+
+Each crate is independently testable and versionable. The rewrite lives in the `rewrite/` directory and is built alongside the main binary.
+
+```bash
+# Build the rewrite workspace
+cargo build --workspace --manifest-path rewrite/Cargo.toml
+```
+
+> 💡 The original `src/` tree remains the primary build target during the transition.
 
 ---
 
@@ -369,10 +440,11 @@ coder --serve
 
 | Phase | Features | Status |
 |-------|----------|--------|
-| **Core** | TUI, AI Providers, Tools, Agent Loop | ✅ Complete |
+| **Core** | TUI, AI Providers, Tools (40+), Agent Loop, Config, Session | ✅ Complete |
 | **Phase 1** | Team, Skill, Subagent, Memory, Storage, LSP, MCP | ✅ Complete |
-| **Phase 2** | Server, Permission, Sync, Voice, OAuth, Computer, Worktree | ✅ Complete |
-| **Phase 3** | Adapters (Telegram, Feishu, Slack), Multi-modal, Plugins | 🚧 Planned |
+| **Phase 2** | Server, Permission, Sync, Voice, OAuth, Computer, Worktree, Security, Analytics, Sandbox, ExecPolicy, i18n | ✅ Complete |
+| **Phase 3** | Adapters (Telegram, Feishu), Multi-modal, Plugins | 🚧 In Progress |
+| **Rewrite** | Modular crate decomposition (core, cli, tui, ai, tools, storage) | 🚧 In Progress |
 
 ---
 
