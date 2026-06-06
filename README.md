@@ -328,6 +328,20 @@ The core is the **Agent ReAct loop** — it thinks, acts, and observes in cycles
 
 ## 🔧 Building from Source
 
+### Quick Build
+
+```bash
+git clone https://github.com/hzt818/coder
+cd coder
+
+# Default build (OpenAI + Anthropic + OpenCode)
+cargo build --release
+
+# Binary:
+#   ./target/release/coder       (Linux/macOS)
+#   .\target\release\coder.exe  (Windows)
+```
+
 ### Feature Flags
 
 Coder uses Cargo features for modular compilation. Here are the common build configurations:
@@ -339,7 +353,7 @@ cargo build --no-default-features --features "ai-openai"
 # Default — TUI + OpenAI + Anthropic + OpenCode
 cargo build --release
 
-# Full — everything (add `security` for encryption/keychain features)
+# Full — everything (all features)
 cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,security,computer,worktree"
 ```
 

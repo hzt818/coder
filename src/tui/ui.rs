@@ -168,7 +168,7 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
         );
         return;
     }
-    if app.messages.is_empty() {
+    if app.messages.is_empty() && app.mode != AppMode::Setup {
         render_welcome(frame, area, app, theme);
         return;
     }

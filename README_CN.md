@@ -156,6 +156,10 @@ git clone https://github.com/hzt818/coder
 cd coder
 cargo build --release
 
+# 编译产物：
+#   ./target/release/coder       (Linux/macOS)
+#   .\target\release\coder.exe  (Windows)
+
 # 安装到系统
 cargo install --path .
 ```
@@ -326,6 +330,20 @@ coder --serve
 
 ## 🔧 从源码构建
 
+### 快速构建
+
+```bash
+git clone https://github.com/hzt818/coder
+cd coder
+
+# 默认构建（OpenAI + Anthropic + OpenCode）
+cargo build --release
+
+# 编译产物：
+#   ./target/release/coder       (Linux/macOS)
+#   .\target\release\coder.exe  (Windows)
+```
+
 ### 特性开关
 
 Coder 用 Cargo 特性来控制编译模块。以下是一些常见的构建配置：
@@ -337,7 +355,7 @@ cargo build --no-default-features --features "ai-openai"
 # 默认构建 — TUI + OpenAI + Anthropic + OpenCode
 cargo build --release
 
-# 全功能构建 — 要啥有啥（加上 `security` 开启加密/密钥链功能）
+# 全功能构建 — 所有特性全开
 cargo build --release --features "ai-openai,ai-anthropic,ai-google,ai-opencode,tools-git,tools-docker,tools-db,tools-oauth,team,skill,subagent,memory,storage,server,mcp,lsp,sync,voice,oauth,analytics,permission,security,computer,worktree"
 ```
 
