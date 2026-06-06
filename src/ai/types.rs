@@ -236,14 +236,10 @@ impl Usage {
 pub enum StreamEvent {
     /// Text content chunk
     TextChunk(String),
+    /// Reasoning/thinking content (extended thinking)
+    ReasoningChunk(String),
     /// AI requesting a tool call
     ToolCallStart(ToolCall),
-    /// Tool call result to send back
-    ToolCallResult {
-        id: String,
-        name: String,
-        result: String,
-    },
     /// Streaming is done
     Done {
         stop_reason: String,

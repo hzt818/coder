@@ -307,6 +307,16 @@ impl Agent {
 
                     while let Some(event) = stream.recv().await {
                         match event {
+                            StreamEvent::ReasoningChunk(thinking) => {
+                                if tx
+                                    .send(AgentEvent::ReasoningChunk(thinking))
+                                    .await
+                                    .is_err()
+                                {
+                                    tracing::warn!("Agent event channel closed, stopping stream");
+                                    break;
+                                }
+                            }
                             StreamEvent::TextChunk(chunk) => {
                                 full_text.push_str(&chunk);
                                 if tx.send(AgentEvent::TextChunk(chunk)).await.is_err() {
@@ -316,12 +326,11 @@ impl Agent {
                             }
                             StreamEvent::ToolCallStart(tc) => {
                                 has_tool_call = true;
-                                tool_calls.push(tc.clone());
+                                let id = tc.id.clone();
+                                let name = tc.name.clone();
+                                tool_calls.push(tc);
                                 if tx
-                                    .send(AgentEvent::ToolCallStart {
-                                        id: tc.id,
-                                        name: tc.name,
-                                    })
+                                    .send(AgentEvent::ToolCallStart { id, name })
                                     .await
                                     .is_err()
                                 {

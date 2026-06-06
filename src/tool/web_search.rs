@@ -4,6 +4,7 @@
 
 use super::*;
 use async_trait::async_trait;
+use scraper::{Html, Selector};
 
 pub struct WebSearchTool;
 
@@ -149,7 +150,7 @@ async fn search_duckduckgo(query: &str, max_results: usize) -> Result<String, St
     Ok(result)
 }
 
-/// Fallback: scrape DuckDuckGo HTML search results
+/// Fallback: scrape DuckDuckGo HTML search results using proper HTML parsing
 async fn search_duckduckgo_html(query: &str, max_results: usize) -> Result<String, String> {
     let encoded: String = url::form_urlencoded::byte_serialize(query.as_bytes()).collect();
     let url = format!("https://html.duckduckgo.com/html/?q={}", encoded);
@@ -170,35 +171,32 @@ async fn search_duckduckgo_html(query: &str, max_results: usize) -> Result<Strin
         .await
         .map_err(|e| format!("Body read failed: {}", e))?;
 
-    // Extract result links using simple HTML parsing
+    // Parse HTML and extract result links using the DOM
+    let document = Html::parse_document(&body);
+    let link_selector = Selector::parse("a.result__a").unwrap();
+
     let mut result = format!("Search results for: {}\n\n", query);
     let mut count = 0;
 
-    for line in body.lines() {
+    for link_elem in document.select(&link_selector) {
         if count >= max_results {
             break;
         }
-        let trimmed = line.trim();
-        if let Some(url_start) = trimmed.find("uddg=") {
-            let url_end = trimmed[url_start + 5..].find('"').unwrap_or(0);
-            let found_url = &trimmed[url_start + 5..url_start + 5 + url_end];
-            // Find the result title
-            let title = trimmed
-                .split('>')
-                .nth(1)
-                .unwrap_or("")
-                .split('<')
-                .next()
-                .unwrap_or("");
-            if !title.is_empty() {
-                count += 1;
-                result.push_str(&format!(
-                    "{}. {} - {}\n",
-                    count,
-                    html_unescape(title),
-                    found_url
-                ));
-            }
+
+        let href = link_elem.value().attr("href").unwrap_or("");
+        let title: String = link_elem.text().collect::<Vec<_>>().join(" ");
+
+        // DDG encodes result URLs in the href with uddg= prefix
+        let found_url = if let Some(url_start) = href.find("uddg=") {
+            let url_end = href[url_start + 5..].find('&').unwrap_or(href.len() - url_start - 5);
+            &href[url_start + 5..url_start + 5 + url_end]
+        } else {
+            href
+        };
+
+        if !title.is_empty() {
+            count += 1;
+            result.push_str(&format!("{}. {} - {}\n", count, title.trim(), found_url));
         }
     }
 
@@ -255,15 +253,6 @@ async fn search_brave(query: &str, max_results: usize) -> Result<String, String>
         }
     }
     Ok(result)
-}
-
-/// Simple HTML entity unescape
-fn html_unescape(s: &str) -> String {
-    s.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
 }
 
 #[cfg(test)]

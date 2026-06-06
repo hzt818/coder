@@ -140,7 +140,8 @@ pub fn invoke_skill_blocking(
         anyhow::bail!("Skill '{}' is not enabled", skill_name);
     }
 
-    let rt = tokio::runtime::Handle::current();
+    let rt = tokio::runtime::Runtime::new()
+        .map_err(|e| anyhow::anyhow!("Failed to create runtime: {}", e))?;
     rt.block_on(async { invoke_skill_async(skill_name, input).await })
 }
 

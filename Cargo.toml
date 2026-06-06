@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros", "sync", "process", "io-util", "signal", "net", "fs", "time"] }
+tokio = { version = "1.40", features = ["rt", "rt-multi-thread", "macros", "sync", "process", "io-util", "io-std", "signal", "net", "fs", "time"] }
 async-trait = "0.1"
 
 # TUI
@@ -71,6 +71,7 @@ thiserror = "2"
 
 # Tool utilities
 glob = "0.3"
+scraper = "0.21"
 
 # Async helpers
 futures = "0.3"
@@ -100,8 +101,10 @@ ai-google = []
 ai-opencode = ["oauth"]
 tools-git = ["dep:gix"]
 tools-docker = ["dep:bollard"]
-tools-db = []
+tools-db = ["storage"]
 tools-oauth = []
+tools-finance = []
+tools-data = []
 team = []
 skill = []
 subagent = []

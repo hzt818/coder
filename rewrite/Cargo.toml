@@ -7,4 +7,5 @@ members = [
   "coder-ai",
   "coder-tools",
   "coder-storage",
+  "coder-context",
 ]
