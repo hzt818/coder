@@ -86,6 +86,23 @@ pub async fn run_app(
                 terminal.clear()?;
                 continue;
             }
+            if let Event::Paste(text) = event {
+                // Bracketed paste: IME-composed CJK text arrives here
+                if app.mode == AppMode::Input && app.vim_state.is_insert() {
+                    for c in text.chars() {
+                        app.insert_char(c);
+                    }
+                } else if app.mode == AppMode::Setup {
+                    if let Some(wizard) = app.wizard.as_mut() {
+                        if wizard.editing != EditingField::None {
+                            for c in text.chars() {
+                                wizard.editing_insert(c);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
             if let Event::Key(key) = event {
                 if key.kind == KeyEventKind::Press {
                     let action = match app.mode {
@@ -373,7 +390,7 @@ fn render_welcome(frame: &mut Frame, area: Rect, app: &App, theme: &AppTheme) {
     } else {
         "Enter to send · @ mention · ! shell · / cmd"
     };
-    input::render_input(frame, input_area, app, &hint, theme);
+    input::render_input(frame, input_area, app, hint, theme);
     if matches!(app.input_submode, InputSubmode::Mention { .. }) {
         mention_popup::render_mention_popup(frame, input_area, &app.input_submode, theme);
     }
@@ -418,8 +435,10 @@ fn handle_input_mode(app: &mut App, key: crossterm::event::KeyEvent) -> InputAct
                 Action::DeleteChar => app.delete_char(),
                 Action::Backspace => app.backspace(),
                 Action::DeleteToEnd => {
-                    if app.cursor_pos < app.input.len() {
-                        app.input.truncate(app.cursor_pos);
+                    let char_count = app.input.chars().count();
+                    if app.cursor_pos < char_count {
+                        let byte_idx = app.char_to_byte(app.cursor_pos);
+                        app.input.truncate(byte_idx);
                     }
                 }
                 Action::DeleteLine => {

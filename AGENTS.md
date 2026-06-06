@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Build & Test Commands
 
@@ -43,7 +43,7 @@ cargo test 2>&1 | grep -E "warning:|error:|test result"
 
 ## Project Architecture
 
-Coder is a Rust (2021 edition, Tokio async) terminal-native AI coding companion. It integrates patterns from Claude Code and OpenCode.
+Coder is a Rust (2021 edition, Tokio async) terminal-native AI coding companion. It integrates patterns from Codex and OpenCode.
 
 ### Core Runtime (`src/core/`)
 - `pricing` — Token counting and cost estimation
@@ -69,7 +69,7 @@ Distinct from `agent/context.rs` which manages the agent's conversation context 
 ### AI Provider Layer (`src/ai/`)
 Each provider implements the `Provider` trait (`fn complete()`, `fn complete_stream()`):
 - `openai` — OpenAI-compatible APIs (also covers DeepSeek, Ollama, Groq, MiniMax)
-- `anthropic` — Anthropic Claude API with extended thinking support
+- `anthropic` — Anthropic Codex API with extended thinking support
 - `google` — Google Gemini API
 - `opencode` — OpenCode free tier (wraps Anthropic via opencode.ai)
 - `custom` — User-defined HTTP API with custom request/response templates

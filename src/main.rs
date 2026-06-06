@@ -184,8 +184,6 @@ fn setup_signal_handler() {
 
         unsafe extern "system" fn console_handler(ctrl_type: u32) -> i32 {
             match ctrl_type {
-                // CTRL_C_EVENT (0) — let tokio's async handler deal with it
-                0 => return 0, // FALSE = pass to next handler
                 // CTRL_BREAK_EVENT (1), CTRL_CLOSE_EVENT (2),
                 // CTRL_LOGOFF_EVENT (5), CTRL_SHUTDOWN_EVENT (6)
                 1 | 2 | 5 | 6 => {
@@ -197,9 +195,9 @@ fn setup_signal_handler() {
                         crossterm::terminal::LeaveAlternateScreen,
                         crossterm::cursor::Show,
                     );
-                    return 1; // TRUE = event handled
+                    1 // TRUE = event handled
                 }
-                _ => return 0, // FALSE = pass to next handler
+                _ => 0, // FALSE = pass to next handler
             }
         }
 
@@ -246,48 +244,44 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
     // If first run, try to use the integrated setup wizard.
     // Fall back to the standalone provider dialog if terminal init fails.
     if is_first_run {
-        match coder::tui::init_terminal() {
-            Ok(mut terminal) => {
-                // Terminal ready — use the integrated setup wizard
-                let provider = create_provider(&config, cli)?;
-                let tools = coder::tool::ToolRegistry::default();
-                let agent = coder::agent::Agent::new(provider, tools);
-                let shutdown = shutdown_notifier();
+        if let Ok(mut terminal) = coder::tui::init_terminal() {
+            // Terminal ready — use the integrated setup wizard
+            let provider = create_provider(&config, cli)?;
+            let tools = coder::tool::ToolRegistry::default();
+            let agent = coder::agent::Agent::new(provider, tools);
+            let shutdown = shutdown_notifier();
 
-                let working_dir = std::fs::canonicalize(&cli.directory)
-                    .map_or_else(|_| cli.directory.clone(), |p| p.display().to_string());
+            let working_dir = std::fs::canonicalize(&cli.directory)
+                .map_or_else(|_| cli.directory.clone(), |p| p.display().to_string());
 
-                let mut app = coder::tui::App::new(
-                    agent,
-                    "setup".to_string(),
-                    "setup".to_string(),
-                    working_dir,
-                );
-                app.wizard = Some(coder::tui::setup_wizard::SetupWizard::new());
-                app.mode = coder::tui::app::AppMode::Setup;
+            let mut app = coder::tui::App::new(
+                agent,
+                "setup".to_string(),
+                "setup".to_string(),
+                working_dir,
+            );
+            app.wizard = Some(coder::tui::setup_wizard::SetupWizard::new());
+            app.mode = coder::tui::app::AppMode::Setup;
 
-                let result =
-                    coder::tui::ui::run_app(&mut app, &mut terminal, &config.ui, shutdown).await;
-                coder::tui::restore_terminal()?;
+            let result =
+                coder::tui::ui::run_app(&mut app, &mut terminal, &config.ui, shutdown).await;
+            coder::tui::restore_terminal()?;
 
-                // If wizard completed (config was saved), reload config for next startup
-                if app.wizard.as_ref().is_some_and(|w| w.saved) {
-                    tracing::info!("Setup wizard completed, config saved.");
-                }
-
-                if SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
-                    std::process::exit(130);
-                }
-                return result;
+            // If wizard completed (config was saved), reload config for next startup
+            if app.wizard.as_ref().is_some_and(|w| w.saved) {
+                tracing::info!("Setup wizard completed, config saved.");
             }
-            Err(_) => {
-                // Terminal init failed — fall back to standalone provider dialog
-                tracing::warn!(
-                    "Terminal init failed, falling back to standalone provider setup dialog"
-                );
-                run_standalone_provider_setup(&mut config).await?;
+
+            if SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
+                std::process::exit(130);
             }
+            return result;
         }
+        // Terminal init failed — fall back to standalone provider dialog
+        tracing::warn!(
+            "Terminal init failed, falling back to standalone provider setup dialog"
+        );
+        run_standalone_provider_setup(&mut config).await?;
     }
 
     // Normal TUI startup (or post-standalone-setup fallback)

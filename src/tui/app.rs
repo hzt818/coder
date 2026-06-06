@@ -198,6 +198,18 @@ impl App {
         }
     }
 
+    // ── Byte/char index helpers ──
+
+    /// Convert a char-index (cursor_pos) to a byte-index in `self.input`.
+    /// Returns `self.input.len()` when the index is at or past the end.
+    pub fn char_to_byte(&self, char_idx: usize) -> usize {
+        self.input
+            .char_indices()
+            .nth(char_idx)
+            .map(|(i, _)| i)
+            .unwrap_or(self.input.len())
+    }
+
     // ── Cursor operations ──
 
     /// Move cursor left by one character
@@ -209,7 +221,8 @@ impl App {
 
     /// Move cursor right by one character
     pub fn cursor_right(&mut self) {
-        if self.cursor_pos < self.input.len() {
+        let char_count = self.input.chars().count();
+        if self.cursor_pos < char_count {
             self.cursor_pos += 1;
         }
     }
@@ -221,7 +234,7 @@ impl App {
 
     /// Move cursor to the end
     pub fn cursor_end(&mut self) {
-        self.cursor_pos = self.input.len();
+        self.cursor_pos = self.input.chars().count();
     }
 
     /// Insert a character at the cursor position
@@ -252,7 +265,8 @@ impl App {
             }
         }
 
-        self.input.insert(self.cursor_pos, c);
+        let byte_idx = self.char_to_byte(self.cursor_pos);
+        self.input.insert(byte_idx, c);
         self.cursor_pos += 1;
         self.clear_mention_on_space(c);
     }
@@ -260,13 +274,15 @@ impl App {
     /// Delete character before cursor (Backspace)
     pub fn backspace(&mut self) {
         if self.cursor_pos > 0 {
-            let was_at = self.cursor_pos - 1;
-            self.input.remove(was_at);
+            let byte_idx = self.char_to_byte(self.cursor_pos - 1);
+            self.input.remove(byte_idx);
             self.cursor_pos -= 1;
 
             // If we backspace into or past @, close mention
             if self.cursor_pos > 0 {
-                let prev = self.input[..self.cursor_pos].chars().last();
+                let prev = self.input[..self.char_to_byte(self.cursor_pos)]
+                    .chars()
+                    .last();
                 if prev != Some('@') && self.input_submode != InputSubmode::Normal {
                     self.input_submode = InputSubmode::Normal;
                     self.mark_status_dirty();
@@ -277,8 +293,10 @@ impl App {
 
     /// Delete character at cursor (Delete)
     pub fn delete_char(&mut self) {
-        if self.cursor_pos < self.input.len() {
-            self.input.remove(self.cursor_pos);
+        let char_count = self.input.chars().count();
+        if self.cursor_pos < char_count {
+            let byte_idx = self.char_to_byte(self.cursor_pos);
+            self.input.remove(byte_idx);
         }
     }
 
@@ -287,10 +305,12 @@ impl App {
         if self.cursor_pos == 0 {
             return;
         }
-        let before = &self.input[..self.cursor_pos];
+        let cursor_byte = self.char_to_byte(self.cursor_pos);
+        let before = &self.input[..cursor_byte];
         if let Some(pos) = before.rfind([' ', '/', '!', '@']) {
-            let delete_len = self.cursor_pos - pos;
-            for _ in 0..delete_len {
+            // Count chars from `pos` (byte) to `cursor_byte` (byte) to know how many to remove
+            let chars_to_remove = self.input[pos..cursor_byte].chars().count();
+            for _ in 0..chars_to_remove {
                 self.input.remove(pos);
                 self.cursor_pos -= 1;
             }
@@ -399,15 +419,18 @@ impl App {
                 .map(|(_, n)| n)
                 .unwrap_or(selected_item);
 
-            // Find the @ position
-            if let Some(at_pos) = self.input[..self.cursor_pos].rfind('@') {
+            let cursor_byte = self.char_to_byte(self.cursor_pos);
+            // Find the @ position (byte offset)
+            if let Some(at_byte) = self.input[..cursor_byte].rfind('@') {
                 // Replace from @ to cursor with the selected name
-                let after_cursor = self.input[self.cursor_pos..].to_string();
-                self.input.truncate(at_pos);
+                let after_cursor = self.input[cursor_byte..].to_string();
+                self.input.truncate(at_byte);
                 self.input.push_str(name);
                 self.input.push(' ');
                 self.input.push_str(&after_cursor);
-                self.cursor_pos = at_pos + name.len() + 1;
+                // cursor_pos is char-index: count chars up to new cursor position
+                let new_cursor_byte = at_byte + name.len() + 1;
+                self.cursor_pos = self.input[..new_cursor_byte].chars().count();
             }
 
             self.input_submode = InputSubmode::Normal;
@@ -419,9 +442,10 @@ impl App {
     pub fn update_mention_filter(&mut self) {
         // Extract query first (avoid simultaneous borrows)
         let extracted = if let InputSubmode::Mention { .. } = self.input_submode {
-            self.input[..self.cursor_pos]
+            let cursor_byte = self.char_to_byte(self.cursor_pos);
+            self.input[..cursor_byte]
                 .rfind('@')
-                .map(|at_pos| self.input[at_pos + 1..self.cursor_pos].to_string())
+                .map(|at_byte| self.input[at_byte + 1..cursor_byte].to_string())
         } else {
             None
         };
@@ -1192,7 +1216,7 @@ impl App {
             }
             let new_pos = pos - 1;
             self.input = self.input_history[new_pos].clone();
-            self.cursor_pos = self.input.len();
+            self.cursor_pos = self.input.chars().count();
             self.history_position = Some(new_pos);
         }
     }
@@ -1202,12 +1226,12 @@ impl App {
         if let Some(pos) = self.history_position {
             if pos + 1 < self.input_history.len() {
                 self.input = self.input_history[pos + 1].clone();
-                self.cursor_pos = self.input.len();
+                self.cursor_pos = self.input.chars().count();
                 self.history_position = Some(pos + 1);
             } else {
                 // Restore the saved unsent input
                 self.input = std::mem::take(&mut self.saved_input);
-                self.cursor_pos = self.input.len();
+                self.cursor_pos = self.input.chars().count();
                 self.history_position = None;
             }
         }

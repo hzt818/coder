@@ -342,7 +342,7 @@ impl SetupWizard {
                     self.model = "gemini-2.5-flash".into();
                 }
             }
-            "opencode" | _ => {
+            _ => {
                 if self.base_url.is_empty() {
                     self.base_url = "https://opencode.ai/zen/v1".into();
                 }
@@ -394,20 +394,39 @@ impl SetupWizard {
     }
 
     pub fn editing_insert(&mut self, c: char) {
-        self.input_buf.insert(self.cursor, c);
+        let byte_idx = self
+            .input_buf
+            .char_indices()
+            .nth(self.cursor)
+            .map(|(i, _)| i)
+            .unwrap_or(self.input_buf.len());
+        self.input_buf.insert(byte_idx, c);
         self.cursor += 1;
     }
 
     pub fn editing_backspace(&mut self) {
         if self.cursor > 0 {
-            self.input_buf.remove(self.cursor - 1);
+            let byte_idx = self
+                .input_buf
+                .char_indices()
+                .nth(self.cursor - 1)
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            self.input_buf.remove(byte_idx);
             self.cursor -= 1;
         }
     }
 
     pub fn editing_delete(&mut self) {
-        if self.cursor < self.input_buf.len() {
-            self.input_buf.remove(self.cursor);
+        let char_count = self.input_buf.chars().count();
+        if self.cursor < char_count {
+            let byte_idx = self
+                .input_buf
+                .char_indices()
+                .nth(self.cursor)
+                .map(|(i, _)| i)
+                .unwrap_or(self.input_buf.len());
+            self.input_buf.remove(byte_idx);
         }
     }
 
@@ -418,7 +437,8 @@ impl SetupWizard {
     }
 
     pub fn editing_right(&mut self) {
-        if self.cursor < self.input_buf.len() {
+        let char_count = self.input_buf.chars().count();
+        if self.cursor < char_count {
             self.cursor += 1;
         }
     }
@@ -428,7 +448,7 @@ impl SetupWizard {
     }
 
     pub fn editing_end(&mut self) {
-        self.cursor = self.input_buf.len();
+        self.cursor = self.input_buf.chars().count();
     }
 
     // ── Validation ──
@@ -457,7 +477,7 @@ impl SetupWizard {
                     return Some(format!("Timeout must be a number: {e}"));
                 }
                 let t: u64 = self.timeout_seconds.trim().parse().unwrap_or(0);
-                if t < 10 || t > 600 {
+                if !(10..=600).contains(&t) {
                     return Some("Timeout must be 10–600 seconds.".into());
                 }
                 if let Err(e) = self.max_output_mb.trim().parse::<u64>() {
@@ -470,7 +490,7 @@ impl SetupWizard {
                     return Some(format!("Auto-save interval must be a number: {e}"));
                 }
                 let a: u64 = self.auto_save_interval.trim().parse().unwrap_or(0);
-                if a < 5 || a > 3600 {
+                if !(5..=3600).contains(&a) {
                     return Some("Auto-save must be 5–3600 seconds.".into());
                 }
                 if let Err(e) = self.max_messages_before_compact.trim().parse::<usize>() {
@@ -1193,21 +1213,20 @@ fn render_editing_dialog(frame: &mut Frame, area: Rect, w: &SetupWizard, theme: 
 
     // Mask API key display
     let display_value = if matches!(w.editing, EditingField::ApiKey) {
-        "*".repeat(w.input_buf.len())
+        "*".repeat(w.input_buf.chars().count())
     } else {
         w.input_buf.clone()
     };
 
     // Show cursor
     let display = if display_value.is_empty() {
-        format!("▌")
+        "▌".to_string()
     } else {
-        let c = w.cursor.min(display_value.len());
-        format!(
-            "{}▌{}",
-            &display_value[..c],
-            &display_value[c..],
-        )
+        let char_count = display_value.chars().count();
+        let c = w.cursor.min(char_count);
+        let before: String = display_value.chars().take(c).collect();
+        let after: String = display_value.chars().skip(c).collect();
+        format!("{before}▌{after}")
     };
 
     let lines = vec![

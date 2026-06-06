@@ -49,6 +49,7 @@ pub fn init_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
         crossterm::terminal::EnterAlternateScreen,
         crossterm::cursor::Hide,
         crossterm::event::EnableMouseCapture,
+        crossterm::event::EnableBracketedPaste,
     )?;
     let backend = CrosstermBackend::new(stdout);
     let terminal = Terminal::new(backend)?;
@@ -59,6 +60,7 @@ pub fn init_terminal() -> Result<Terminal<CrosstermBackend<std::io::Stdout>>> {
 pub fn restore_terminal() -> Result<()> {
     crossterm::execute!(
         stdout(),
+        crossterm::event::DisableBracketedPaste,
         crossterm::terminal::LeaveAlternateScreen,
         crossterm::cursor::Show,
         crossterm::event::DisableMouseCapture,

@@ -13,13 +13,15 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Paragraph, Wrap};
 
 /// Prepare input text for display, replacing newlines with visual indicators.
-/// Returns (display_text, display_cursor_position)
+/// `cursor_pos` is a char-index (not byte-index).
+/// Returns (display_text, display_cursor_byte_position)
 fn prepare_input_display(input: &str, cursor_pos: usize) -> (String, usize) {
-    let before_cursor = &input[..cursor_pos];
-    let after_cursor = &input[cursor_pos..];
+    let chars: Vec<char> = input.chars().collect();
+    let before: String = chars[..cursor_pos].iter().collect();
+    let after: String = chars[cursor_pos..].iter().collect();
 
-    let display_before = before_cursor.replace('\n', "⏎");
-    let display_after = after_cursor.replace('\n', "⏎");
+    let display_before = before.replace('\n', "⏎");
+    let display_after = after.replace('\n', "⏎");
     let display_cursor = display_before.len();
     let display_input = format!("{}{}", display_before, display_after);
 
