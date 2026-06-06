@@ -24,11 +24,13 @@ pub mod ci;
 pub mod diagnostics;
 pub mod docs;
 pub mod fim_edit;
+#[cfg(feature = "tools-finance")]
 pub mod finance;
 #[cfg(feature = "tools-git")]
 pub mod git;
 pub mod github;
 pub mod list_dir;
+#[cfg(feature = "lsp")]
 pub mod lsp;
 pub mod monitor;
 pub mod notification;
@@ -44,6 +46,7 @@ pub mod snapshot_tool;
 pub mod task;
 pub mod task_gate;
 pub mod task_shell;
+#[cfg(feature = "tools-data")]
 pub mod validate_data;
 pub mod web_fetch;
 pub mod web_run;

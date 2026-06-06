@@ -1,1 +1,1 @@
-D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\target\debug\libcoder_ai.rlib: D:\Coder\coder.worktrees\agents-rust-project-rewrite-analysis-planning\rewrite\coder-ai\src\lib.rs
+D:\Coder\coder\rewrite\target\debug\libcoder_ai.rlib: D:\Coder\coder\rewrite\coder-ai\src\lib.rs

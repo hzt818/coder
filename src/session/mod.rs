@@ -9,6 +9,7 @@ pub mod search;
 
 /// A conversation session
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Session {
     pub id: String,
     pub created_at: String,
@@ -49,10 +50,23 @@ impl Default for Session {
 
 /// Summary of a session (for listing)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SessionSummary {
     pub id: String,
     pub title: String,
     pub created_at: String,
     pub updated_at: String,
     pub message_count: usize,
+}
+
+impl Default for SessionSummary {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            title: String::new(),
+            created_at: String::new(),
+            updated_at: String::new(),
+            message_count: 0,
+        }
+    }
 }

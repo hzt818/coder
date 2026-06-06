@@ -10,7 +10,6 @@ pub mod commands;
 pub mod config;
 pub mod context;
 pub mod core;
-pub mod execpolicy;
 pub mod sandbox;
 pub mod session;
 pub mod tool;

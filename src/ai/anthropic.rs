@@ -294,7 +294,16 @@ impl Provider for AnthropicProvider {
                                                     }
                                                 }
                                                 "thinking_delta" => {
-                                                    // Thinking deltas during extended thinking; don't forward verbatim
+                                                    if let Some(thinking) = delta
+                                                        .get("thinking")
+                                                        .and_then(|v| v.as_str())
+                                                    {
+                                                        let _ = tx
+                                                            .send(StreamEvent::ReasoningChunk(
+                                                                thinking.to_string(),
+                                                            ))
+                                                            .await;
+                                                    }
                                                 }
                                                 "input_json_delta" => {
                                                     if let Some(partial) = delta

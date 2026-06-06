@@ -1,6 +1,7 @@
 //! OAuth 2.0 authorization code flow implementation
 
 use super::{OAuthError, OAuthProviderConfig, OAuthResult, TokenResponse};
+use std::time::Instant;
 
 /// Manages the OAuth 2.0 authorization code flow
 #[derive(Debug, Clone)]
@@ -9,6 +10,8 @@ pub struct OAuthFlow {
     config: OAuthProviderConfig,
     /// Currently stored token
     current_token: Option<TokenResponse>,
+    /// When the current token was obtained
+    token_obtained_at: Option<Instant>,
     /// HTTP client for token requests
     http_client: reqwest::Client,
 }
@@ -19,6 +22,7 @@ impl OAuthFlow {
         Self {
             config,
             current_token: None,
+            token_obtained_at: None,
             http_client: reqwest::Client::new(),
         }
     }
@@ -72,6 +76,7 @@ impl OAuthFlow {
             .map_err(|e| OAuthError::TokenRequestFailed(format!("Failed to parse token: {e}")))?;
 
         self.current_token = Some(token.clone());
+        self.token_obtained_at = Some(Instant::now());
         Ok(token)
     }
 
@@ -108,6 +113,7 @@ impl OAuthFlow {
             .map_err(|e| OAuthError::TokenRequestFailed(format!("Failed to parse token: {e}")))?;
 
         self.current_token = Some(token.clone());
+        self.token_obtained_at = Some(Instant::now());
         Ok(token)
     }
 
@@ -116,17 +122,21 @@ impl OAuthFlow {
         self.current_token.as_ref()
     }
 
-    /// Check if the current token is expired (approximate check)
+    /// Check if the current token is expired, accounting for elapsed time
     pub fn is_token_expired(&self) -> bool {
-        self.current_token
-            .as_ref()
-            .map(|t| t.expires_in < 60)
-            .unwrap_or(true)
+        match (&self.current_token, self.token_obtained_at) {
+            (Some(token), Some(obtained_at)) => {
+                let elapsed = Instant::now().duration_since(obtained_at);
+                elapsed.as_secs() + 60 >= token.expires_in // 60s buffer
+            }
+            _ => true, // No token = expired
+        }
     }
 
     /// Clear the stored token (force re-authentication)
     pub fn clear_token(&mut self) {
         self.current_token = None;
+        self.token_obtained_at = None;
     }
 
     /// Get a reference to the provider configuration

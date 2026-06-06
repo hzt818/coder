@@ -113,8 +113,11 @@ impl Default for ToolRegistry {
         reg.register(Arc::new(diagnostics::DiagnosticsTool));
         reg.register(Arc::new(run_tests::RunTestsTool));
         reg.register(Arc::new(notification::PushNotificationTool));
+        #[cfg(feature = "lsp")]
         reg.register(Arc::new(lsp::LspTool));
+        #[cfg(feature = "tools-finance")]
         reg.register(Arc::new(finance::FinanceTool));
+        #[cfg(feature = "tools-data")]
         reg.register(Arc::new(validate_data::ValidateDataTool));
         reg.register(Arc::new(recall::RecallTool));
         reg.register(Arc::new(monitor::MonitorTool));

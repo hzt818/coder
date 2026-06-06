@@ -3,8 +3,12 @@
 //! Provides OAuth 2.0 authentication for OpenCode services.
 //! Implements a complete OAuth 2.0 authorization code flow with:
 //! - Local HTTP server for callback
-//! - Automatic browser opening
+//! - Automatic browser opening (via `open::that`, compatible with open crate v5)
 //! - Token exchange and storage
+//!
+//! Verified API endpoints (as of 2026-06-06):
+//!   Auth:  https://opencode.ai/oauth/authorize
+//!   Token: https://opencode.ai/oauth/token
 
 use crate::oauth::{OAuthError, TokenResponse};
 use serde::{Deserialize, Serialize};
@@ -109,7 +113,7 @@ impl OAuthFlowHandler {
 
 async fn start_callback_server(
     tx: oneshot::Sender<OAuthFlowState>,
-) -> Result<(), OAuthError> {
+) -> Result<u16, OAuthError> {
     use axum::{
         extract::{Query, State},
         response::{Html, IntoResponse, Response},
@@ -155,19 +159,24 @@ async fn start_callback_server(
         .route("/oauth/callback", get(callback_handler))
         .with_state(state);
 
-    let addr: SocketAddr = "127.0.0.1:3001".parse().unwrap();
+    let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .map_err(|e| OAuthError::Http(format!("Failed to bind callback server: {e}")))?;
 
-    tracing::info!("OAuth callback server listening on {}", addr);
+    let actual_port = listener
+        .local_addr()
+        .map(|a| a.port())
+        .map_err(|e| OAuthError::Http(format!("Failed to get local address: {e}")))?;
+
+    tracing::info!("OAuth callback server listening on 127.0.0.1:{}", actual_port);
 
     tokio::spawn(async move {
         axum::serve(listener, app).await.ok();
     });
 
-    Ok(())
+    Ok(actual_port)
 }
 
 fn open_browser(url: &str) -> Result<(), OAuthError> {
@@ -176,16 +185,20 @@ fn open_browser(url: &str) -> Result<(), OAuthError> {
 }
 
 pub async fn run_oauth_flow_impl() -> OAuthResultEnum {
-    let config = OpenCodeOAuth::default();
-    let handler = OAuthFlowHandler::new(config.clone());
-
+    let mut config = OpenCodeOAuth::default();
     let state = uuid::Uuid::new_v4().to_string();
 
     let (tx, rx) = oneshot::channel::<OAuthFlowState>();
 
-    if let Err(e) = start_callback_server(tx).await {
-        return OAuthResultEnum::Error(format!("Failed to start callback server: {e}"));
-    }
+    // Bind to an OS-assigned port to avoid conflicts (port 0 = dynamic)
+    let callback_port = match start_callback_server(tx).await {
+        Ok(port) => port,
+        Err(e) => return OAuthResultEnum::Error(format!("Failed to start callback server: {e}")),
+    };
+
+    // Update redirect URI with the actual bound port
+    config.redirect_uri = format!("http://127.0.0.1:{}/oauth/callback", callback_port);
+    let handler = OAuthFlowHandler::new(config.clone());
 
     let auth_url = match handler.authorization_url(&state) {
         Ok(url) => url,

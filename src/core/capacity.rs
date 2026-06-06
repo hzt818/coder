@@ -164,7 +164,9 @@ pub fn is_large_output(output: &str, threshold_tokens: usize) -> bool {
     crate::core::pricing::estimate_tokens(output) > threshold_tokens
 }
 
-/// Route large output: truncate for context, return spillover marker
+/// Route large output: truncate for context.
+/// Returns the (possibly truncated) output. The spillover storage layer
+/// is not yet implemented, so the second return value is always `None`.
 pub fn route_large_output(
     output: &str,
     tool_name: &str,
@@ -182,9 +184,8 @@ pub fn route_large_output(
         config.max_output_tokens,
         tool_name,
     );
-    let spillover_id = format!("{}-spillover-{}", tool_name, uuid::Uuid::new_v4());
 
-    (preview, Some(spillover_id))
+    (preview, None)
 }
 
 #[cfg(test)]
@@ -270,8 +271,9 @@ mod tests {
         };
         let large = "x".repeat(1000);
         let (result, spillover) = route_large_output(&large, "test", &config);
-        assert!(result.len() < large.len());
-        assert!(spillover.is_some());
+        assert!(result.len() < large.len(), "Large output should be truncated");
+        // Spillover storage is not yet implemented, so spillover is always None
+        assert!(spillover.is_none());
     }
 
     #[test]

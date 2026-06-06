@@ -82,22 +82,38 @@ impl Settings {
         }
     }
 
+    /// Resolve `${VAR_NAME}` patterns in a string value.
+    /// Supports both full-string references (`"${KEY}"`) and inline references
+    /// (`"https://${HOST}/v1"`). Missing variables are replaced with empty strings.
     fn resolve_env(value: &str) -> String {
-        if value.starts_with("${") && value.ends_with('}') {
-            let var_name = &value[2..value.len() - 1];
-            match std::env::var(var_name) {
-                Ok(v) => v,
-                Err(_) => {
-                    tracing::warn!(
-                        "Environment variable '{}' is not set (referenced as '{}'). The API key will be empty.",
-                        var_name, value
-                    );
-                    String::new()
+        let mut result = String::with_capacity(value.len());
+        let mut chars = value.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '$' && chars.peek() == Some(&'{') {
+                chars.next(); // consume '{'
+                let mut var_name = String::new();
+                for c in chars.by_ref() {
+                    if c == '}' {
+                        break;
+                    }
+                    var_name.push(c);
                 }
+                match std::env::var(&var_name) {
+                    Ok(v) => result.push_str(&v),
+                    Err(_) => {
+                        tracing::warn!(
+                            "Environment variable '{}' is not set (referenced in '{}')",
+                            var_name, value
+                        );
+                    }
+                }
+            } else {
+                result.push(ch);
             }
-        } else {
-            value.to_string()
         }
+
+        result
     }
 }
 

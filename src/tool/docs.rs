@@ -5,6 +5,7 @@
 
 use super::*;
 use async_trait::async_trait;
+use scraper::Html;
 
 pub struct DocsTool;
 
@@ -83,7 +84,7 @@ async fn fetch_docs_web(library: &str, query: &str) -> Result<String, String> {
         .map_err(|e| format!("Body error: {}", e))?;
 
     // Strip HTML tags and extract meaningful text content
-    let text = strip_html_tags(&body);
+    let text = extract_text_from_html(&body);
     let lines: Vec<&str> = text
         .lines()
         .map(|l| l.trim())
@@ -116,59 +117,24 @@ async fn fetch_docs_web(library: &str, query: &str) -> Result<String, String> {
     Ok(result)
 }
 
-/// Simple HTML tag stripper that preserves text content.
-fn strip_html_tags(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let mut in_tag = false;
-    let mut in_entity = false;
-    let mut entity_buf = String::new();
+/// Extract text from HTML using a proper parser (scraper crate).
+/// Handles entity decoding, script/style exclusion, and whitespace collapsing.
+fn extract_text_from_html(html: &str) -> String {
+    let document = Html::parse_document(html);
+    let root = document.root_element();
+    let mut text = String::with_capacity(html.len() / 2);
 
-    for ch in html.chars() {
-        if in_tag {
-            if ch == '>' {
-                in_tag = false;
-            }
-            continue;
+    for node in root.descendants() {
+        if let Some(t) = node.value().as_text() {
+            text.push_str(&t.text);
+            text.push(' ');
         }
-        if ch == '<' {
-            in_tag = true;
-            continue;
-        }
-        if ch == '&' {
-            in_entity = true;
-            entity_buf.clear();
-            continue;
-        }
-        if in_entity {
-            if ch == ';' {
-                let decoded = match entity_buf.as_str() {
-                    "amp" => "&",
-                    "lt" => "<",
-                    "gt" => ">",
-                    "quot" => "\"",
-                    "nbsp" => " ",
-                    "apos" => "'",
-                    _ => "",
-                };
-                result.push_str(decoded);
-                in_entity = false;
-            } else if entity_buf.len() < 16 {
-                entity_buf.push(ch);
-            } else {
-                result.push('&');
-                result.push_str(&entity_buf);
-                result.push(ch);
-                in_entity = false;
-            }
-            continue;
-        }
-        result.push(ch);
     }
 
-    // Collapse multiple whitespace into single space
-    let mut cleaned = String::with_capacity(result.len());
+    // Collapse multiple whitespace characters into a single space
+    let mut cleaned = String::with_capacity(text.len());
     let mut prev_space = false;
-    for ch in result.chars() {
+    for ch in text.chars() {
         if ch.is_whitespace() {
             if !prev_space {
                 cleaned.push(' ');
@@ -207,34 +173,32 @@ mod tests {
     }
 
     #[test]
-    fn test_strip_html_simple() {
+    fn test_extract_text_simple() {
         let html = "<p>Hello <b>World</b></p>";
-        assert_eq!(strip_html_tags(html).trim(), "Hello World");
+        assert_eq!(extract_text_from_html(html).trim(), "Hello World");
     }
 
     #[test]
-    fn test_strip_html_entities() {
+    fn test_extract_text_entities() {
         let html = "<p>Rust &amp; C++ are &lt;fast&gt;</p>";
-        assert_eq!(strip_html_tags(html).trim(), "Rust & C++ are <fast>");
+        assert_eq!(extract_text_from_html(html).trim(), "Rust & C++ are <fast>");
     }
 
     #[test]
-    fn test_strip_html_no_tags() {
+    fn test_extract_text_no_tags() {
         let text = "Plain text content";
-        assert_eq!(strip_html_tags(text).trim(), "Plain text content");
+        assert_eq!(extract_text_from_html(text).trim(), "Plain text content");
     }
 
     #[test]
-    fn test_strip_html_empty() {
-        assert_eq!(strip_html_tags("").trim(), "");
+    fn test_extract_text_empty() {
+        assert_eq!(extract_text_from_html("").trim(), "");
     }
 
     #[test]
-    fn test_strip_html_nested() {
+    fn test_extract_text_nested() {
         let html = "<div><ul><li>Item 1</li><li>Item 2</li></ul></div>";
-        // Without whitespace between tags, items get concatenated
-        let stripped = strip_html_tags(html);
-        let result = stripped.trim();
+        let result = extract_text_from_html(html);
         assert!(
             result.contains("Item 1"),
             "Expected 'Item 1' in result, got: '{}'",
