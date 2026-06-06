@@ -240,15 +240,26 @@ mod tests {
         use tempfile::TempDir;
         let tmp = TempDir::new().unwrap();
 
-        // Temporarily override coder_dir by manipulating the util path
         let session = Session::new();
         let workspace = tmp.path().to_str().unwrap().to_string();
 
-        // Save checkpoint
+        // Save checkpoint — should succeed with a valid session
+        let result = save_checkpoint(&session, &workspace);
         assert!(
-            save_checkpoint(&session, &workspace).is_ok()
-                || save_checkpoint(&session, &workspace).is_err()
+            result.is_ok(),
+            "save_checkpoint should succeed: {:?}",
+            result.err()
         );
+
+        // Recover the session from checkpoint
+        let recovered = try_recover(&workspace).unwrap();
+        assert!(
+            recovered.is_some(),
+            "try_recover should find the session we just saved"
+        );
+
+        let recovered_session = recovered.unwrap();
+        assert_eq!(recovered_session.id, session.id);
 
         // Clean up
         let _ = clear_checkpoint();
@@ -256,17 +267,18 @@ mod tests {
 
     #[test]
     fn test_offline_queue_roundtrip() {
-        // Queue a message
+        // Queue a message — should succeed
+        let result = queue_offline("test message 1");
         assert!(
-            queue_offline("test message 1").is_ok() || queue_offline("test message 1").is_err()
+            result.is_ok(),
+            "queue_offline should succeed: {:?}",
+            result.err()
         );
 
-        // Drain queue
-        if let Ok(msgs) = drain_offline_queue() {
-            if !msgs.is_empty() {
-                assert_eq!(msgs[0].content, "test message 1");
-            }
-        }
+        // Drain queue and verify content
+        let msgs = drain_offline_queue().unwrap();
+        assert!(!msgs.is_empty(), "Should have queued at least one message");
+        assert_eq!(msgs[0].content, "test message 1");
     }
 
     #[test]

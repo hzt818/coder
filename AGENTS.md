@@ -37,8 +37,12 @@ cargo audit --deny warnings
 # Run verbose with warning/error output visible
 cargo test 2>&1 | grep -E "warning:|error:|test result"
 
-# Linux system dependencies (needed for full builds)
-# sudo apt-get install -y pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
+# System dependencies (needed for full builds with `storage`/`tools-db`/`--all-features`)
+# The `storage` feature builds SQLite from source (via libsql-ffi) and requires a C compiler:
+#   Windows: Install "Build Tools for Visual Studio 2022" (MSVC)
+#            https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
+#   macOS:   xcode-select --install (Xcode Command Line Tools includes Clang)
+#   Linux:   sudo apt-get install -y build-essential pkg-config libssl-dev libdbus-1-dev libfontconfig-dev
 ```
 
 ## Project Architecture
@@ -201,7 +205,7 @@ CLI flags (`--provider`, `--model`, `-c`) take precedence over these. The config
 
 Feature groups from Cargo.toml:
 - **AI Providers:** `ai-openai`, `ai-anthropic`, `ai-google`, `ai-opencode`
-- **Extra Tools:** `tools-git`, `tools-docker`, `tools-db`, `tools-oauth`
+- **Extra Tools:** `tools-git`, `tools-docker`, `tools-db`, `tools-oauth`, `tools-finance`, `tools-data`
 - **Phase 1:** `team`, `skill`, `subagent`, `memory`, `storage`, `lsp`, `mcp`
 - **Phase 2:** `server`, `permission`, `sync`, `voice`, `oauth`, `analytics`, `security`, `computer`, `worktree`
 

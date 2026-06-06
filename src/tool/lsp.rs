@@ -2,15 +2,10 @@
 //!
 //! Uses the LSP client infrastructure in `crate::lsp` to provide
 //! go_to_definition, find_references, hover, document_symbols,
-//! workspace_symbols, and call_hierarchy. Falls back to helpful
-//! grep hints when the LSP feature is not enabled.
+//! workspace_symbols, and call_hierarchy.
 
 use super::*;
 use async_trait::async_trait;
-
-// When the `lsp` feature is enabled, the full LSP client is available.
-// When disabled, we fall back to grep hints.
-#[cfg(feature = "lsp")]
 use std::sync::OnceLock;
 
 /// Global LSP handler: initialized once, reused across tool invocations.
@@ -93,25 +88,8 @@ impl Tool for LspTool {
             return ToolResult::err("operation is required");
         }
 
-        // Real LSP execution when the feature is enabled
-        #[cfg(feature = "lsp")]
-        {
-            return self.execute_real(op, &args).await;
-        }
-
-        // Fallback — when the `lsp` feature is not compiled in.
-        #[cfg(not(feature = "lsp"))]
-        {
-            match op {
-                "go_to_definition" | "find_references" | "hover" => {
-                    let file = args.get("file_path").and_then(|f| f.as_str()).unwrap_or("");
-                    let line = args.get("line").and_then(|l| l.as_i64()).unwrap_or(0);
-                    let col = args.get("column").and_then(|c| c.as_i64()).unwrap_or(0);
-                    ToolResult::ok(format!("LSP '{}' for {}:{}:{} requires the 'lsp' feature.\nBuild with: cargo build --features lsp\nFor now, try: grep -rn 'symbol_name' src/", op, file, line, col))
-                }
-                _ => ToolResult::err(format!("Unknown LSP operation: '{}'. Supported operations: go_to_definition, find_references, hover, document_symbols, workspace_symbols, call_hierarchy", op)),
-            }
-        }
+        // Real LSP execution
+        self.execute_real(op, &args).await
     }
     fn requires_permission(&self) -> bool {
         false

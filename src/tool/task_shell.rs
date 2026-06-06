@@ -24,7 +24,6 @@ pub enum ShellStatus {
 }
 
 /// A tracked background shell job.
-#[derive(Debug)]
 struct BackgroundJob {
     child: Option<Child>,
     stdin: Option<ChildStdin>,
@@ -32,6 +31,8 @@ struct BackgroundJob {
     stderr_buf: Arc<Mutex<Vec<u8>>>,
     status: ShellStatus,
     exit_code: Option<i32>,
+    /// Signalled when the process exits or is cancelled
+    notify: Arc<tokio::sync::Notify>,
 }
 
 impl BackgroundJob {
@@ -45,11 +46,13 @@ impl BackgroundJob {
                     } else {
                         ShellStatus::Failed
                     };
-                    // Read remaining output
-                    // ... (handled by reader threads)
+                    self.notify.notify_one();
                 }
                 Ok(None) => {} // still running
-                Err(_) => self.status = ShellStatus::Failed,
+                Err(_) => {
+                    self.status = ShellStatus::Failed;
+                    self.notify.notify_one();
+                }
             }
         }
     }
@@ -161,6 +164,7 @@ impl BackgroundShellManager {
             stderr_buf,
             status: ShellStatus::Running,
             exit_code: None,
+            notify: Arc::new(tokio::sync::Notify::new()),
         };
 
         self.jobs.write().await.insert(id.clone(), job);
@@ -175,9 +179,16 @@ impl BackgroundShellManager {
 
     /// Wait for a job and return its output.
     pub async fn wait(&self, id: &str, timeout_secs: Option<u64>) -> Result<String, String> {
-        // This is simplified - a real implementation would poll
         let deadline = timeout_secs.map(|s| Instant::now() + Duration::from_secs(s));
+        let notify = {
+            let jobs = self.jobs.read().await;
+            jobs.get(id)
+                .map(|j| j.notify.clone())
+                .ok_or_else(|| format!("Job not found: {}", id))?
+        };
+
         loop {
+            // Check current status
             {
                 let mut jobs = self.jobs.write().await;
                 if let Some(job) = jobs.get_mut(id) {
@@ -191,16 +202,26 @@ impl BackgroundShellManager {
                             job.stderr_buf.lock().unwrap().len()
                         ));
                     }
-                } else {
-                    return Err(format!("Job not found: {}", id));
                 }
             }
+
+            // Check timeout
             if let Some(dead) = deadline {
                 if Instant::now() >= dead {
                     return Err("Timeout".to_string());
                 }
+                let remaining = dead.duration_since(Instant::now());
+                // Wait for notification or timeout, whichever comes first
+                tokio::select! {
+                    _ = notify.notified() => {}
+                    _ = tokio::time::sleep(remaining) => {
+                        return Err("Timeout".to_string());
+                    }
+                }
+            } else {
+                // No timeout — wait indefinitely for notification
+                notify.notified().await;
             }
-            tokio::time::sleep(Duration::from_millis(200)).await;
         }
     }
 
@@ -231,6 +252,7 @@ impl BackgroundShellManager {
                 let _ = child.kill();
                 let _ = child.wait();
             }
+            job.notify.notify_one();
             Ok(())
         } else {
             Err(format!("Job not found: {}", id))
