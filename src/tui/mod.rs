@@ -26,6 +26,7 @@ pub mod dialog_provider_setup;
 pub mod help;
 pub mod input;
 pub mod mention_popup;
+pub mod setup_wizard;
 pub mod status_bar;
 pub mod syntax;
 pub mod theme;

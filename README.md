@@ -311,7 +311,7 @@ Type `@` in the input to trigger autocomplete:
 │  └──────────┘ └──────────┘ └──────────┘ └──────────────────┘   │
 ├─────────────────────────────────────────────────────────────────┤
 │                    Foundational Systems                          │
-│  Config (TOML) · Session · Sandbox · ExecPolicy · i18n         │
+│  Config (TOML) · Session · Sandbox · ExecPolicy                │
 ├─────────────────────────────────────────────────────────────────┤
 │                     Storage Layer (SQLite/libSQL)                │
 └─────────────────────────────────────────────────────────────────┘
@@ -442,7 +442,7 @@ coder --serve
 |-------|----------|--------|
 | **Core** | TUI, AI Providers, Tools (40+), Agent Loop, Config, Session | ✅ Complete |
 | **Phase 1** | Team, Skill, Subagent, Memory, Storage, LSP, MCP | ✅ Complete |
-| **Phase 2** | Server, Permission, Sync, Voice, OAuth, Computer, Worktree, Security, Analytics, Sandbox, ExecPolicy, i18n | ✅ Complete |
+| **Phase 2** | Server, Permission, Sync, Voice, OAuth, Computer, Worktree, Security, Analytics, Sandbox, ExecPolicy | ✅ Complete |
 | **Phase 3** | Adapters (Telegram, Feishu), Multi-modal, Plugins | 🚧 In Progress |
 | **Rewrite** | Modular crate decomposition (core, cli, tui, ai, tools, storage) | 🚧 In Progress |
 

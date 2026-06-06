@@ -119,7 +119,6 @@ Built with Ratatui + Crossterm:
 - `session/` — Session persistence, history search, load/save
 - `commands/` — Slash command parsing and dispatch (`/help`, `/git`, `/plan`, etc.)
 - `execpolicy/` — Layered permission rulesets (deny > builtin > agent > user) with arity-aware bash command matching
-- `i18n/` — Internationalization / translations
 - `sandbox/` — Sandboxed execution (local/remote isolation)
 - `security/` — Encryption, keychain, input sanitizer (separate from permission)
 - `util/` — Formatting, path, template utilities

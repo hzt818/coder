@@ -156,7 +156,7 @@ fn setup_signal_handler() {
 fn setup_signal_handler() {
     let notify = shutdown_notifier();
 
-    // Handle Ctrl+C
+    // Handle Ctrl+C via tokio (works on Windows too)
     let notify_ctrlc = notify.clone();
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.ok();
@@ -165,41 +165,50 @@ fn setup_signal_handler() {
         notify_ctrlc.notify_waiters();
     });
 
-    // On Windows, we also handle console events for window close
-    // This provides better graceful shutdown support
+    // On Windows, register a console control handler for close/break events.
+    // This does NOT handle Ctrl+C — tokio::signal::ctrl_c() owns that.
+    // We use SetConsoleCtrlHandler via raw FFI instead of reading from stdin
+    // (which would interfere with crossterm's raw mode and break keyboard input).
     #[cfg(windows)]
     {
-        let notify_console = notify.clone();
-        tokio::spawn(async move {
-            use std::sync::atomic::AtomicBool;
-            use std::sync::Arc;
+        // SetConsoleCtrlHandler: kernel32!SetConsoleCtrlHandler
+        // Registers a handler routine for console process events.
+        extern "system" {
+            fn SetConsoleCtrlHandler(
+                handler: Option<
+                    unsafe extern "system" fn(_ctrl_type: u32) -> i32,
+                >,
+                add: i32,
+            ) -> i32;
+        }
 
-            // Create a stop event for console handler
-            let running = Arc::new(AtomicBool::new(true));
-            let running_clone = running.clone();
-
-            // Spawn a thread to monitor console events
-            std::thread::spawn(move || {
-                use std::io::Read;
-
-                // On Windows, we use a simple stdin monitor as fallback
-                // since native console event handling requires Windows API calls
-                let mut stdin = std::io::stdin();
-                let mut buf = [0u8; 1];
-
-                while running_clone.load(Ordering::SeqCst) {
-                    // Non-blocking read attempt
-                    if stdin.read(&mut buf).is_ok() {
-                        // Ctrl+C sends 0x03 (ETX) or triggers ctrl_c above
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+        unsafe extern "system" fn console_handler(ctrl_type: u32) -> i32 {
+            match ctrl_type {
+                // CTRL_C_EVENT (0) — let tokio's async handler deal with it
+                0 => return 0, // FALSE = pass to next handler
+                // CTRL_BREAK_EVENT (1), CTRL_CLOSE_EVENT (2),
+                // CTRL_LOGOFF_EVENT (5), CTRL_SHUTDOWN_EVENT (6)
+                1 | 2 | 5 | 6 => {
+                    SHUTDOWN_REQUESTED.store(true, Ordering::SeqCst);
+                    // Best-effort terminal restore for close events
+                    let _ = crossterm::terminal::disable_raw_mode();
+                    let _ = crossterm::execute!(
+                        std::io::stdout(),
+                        crossterm::terminal::LeaveAlternateScreen,
+                        crossterm::cursor::Show,
+                    );
+                    return 1; // TRUE = event handled
                 }
-            });
+                _ => return 0, // FALSE = pass to next handler
+            }
+        }
 
-            // Clean up the monitoring thread when notified
-            notify_console.notified().await;
-            running.store(false, Ordering::SeqCst);
-        });
+        unsafe {
+            let result = SetConsoleCtrlHandler(Some(console_handler), 1 /* TRUE */);
+            if result == 0 {
+                tracing::warn!("Failed to register Windows console control handler");
+            }
+        }
     }
 
     tracing::info!("Signal handler initialized (Windows mode)");
@@ -227,47 +236,61 @@ async fn run_headless_mode(config: &coder::config::Settings, cli: &Cli) -> anyho
 }
 
 async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow::Result<()> {
-    // Check if any provider has an API key configured; if not, show setup dialog
+    // Detect first run: no config file exists AND no API key configured
+    let config_path = coder::util::path::coder_dir().join("config.toml");
+    let project_config = std::path::PathBuf::from("./coder.toml");
+    let config_exists = config_path.exists() || project_config.exists();
     let has_api_key = config.ai.providers.values().any(|p| p.api_key.is_some());
-    if !has_api_key {
-        use coder::tui::dialog_provider_setup::{run_provider_setup_dialog, ProviderSetupResult};
+    let is_first_run = !config_exists && !has_api_key;
 
-        let result = run_provider_setup_dialog();
+    // If first run, try to use the integrated setup wizard.
+    // Fall back to the standalone provider dialog if terminal init fails.
+    if is_first_run {
+        match coder::tui::init_terminal() {
+            Ok(mut terminal) => {
+                // Terminal ready — use the integrated setup wizard
+                let provider = create_provider(&config, cli)?;
+                let tools = coder::tool::ToolRegistry::default();
+                let agent = coder::agent::Agent::new(provider, tools);
+                let shutdown = shutdown_notifier();
 
-        match result {
-            ProviderSetupResult::FreeTier => {
-                tracing::info!("User selected OpenCode free tier (anonymous)");
-                save_opencode_config(&mut config, "")?;
-            }
-            ProviderSetupResult::OAuth => {
-                tracing::info!("User selected OAuth flow");
-                #[cfg(feature = "ai-opencode")]
-                {
-                    match coder::oauth::opencode::run_oauth_flow().await {
-                        coder::oauth::opencode::OAuthResultEnum::Success(key) => {
-                            save_opencode_config(&mut config, &key)?;
-                        }
-                        coder::oauth::opencode::OAuthResultEnum::Cancelled => {
-                            anyhow::bail!("OAuth cancelled.");
-                        }
-                        coder::oauth::opencode::OAuthResultEnum::Error(e) => {
-                            anyhow::bail!("OAuth failed: {e}");
-                        }
-                    }
+                let working_dir = std::fs::canonicalize(&cli.directory)
+                    .map_or_else(|_| cli.directory.clone(), |p| p.display().to_string());
+
+                let mut app = coder::tui::App::new(
+                    agent,
+                    "setup".to_string(),
+                    "setup".to_string(),
+                    working_dir,
+                );
+                app.wizard = Some(coder::tui::setup_wizard::SetupWizard::new());
+                app.mode = coder::tui::app::AppMode::Setup;
+
+                let result =
+                    coder::tui::ui::run_app(&mut app, &mut terminal, &config.ui, shutdown).await;
+                coder::tui::restore_terminal()?;
+
+                // If wizard completed (config was saved), reload config for next startup
+                if app.wizard.as_ref().is_some_and(|w| w.saved) {
+                    tracing::info!("Setup wizard completed, config saved.");
                 }
-                #[cfg(not(feature = "ai-opencode"))]
-                anyhow::bail!("OAuth requires 'ai-opencode' feature");
+
+                if SHUTDOWN_REQUESTED.load(Ordering::SeqCst) {
+                    std::process::exit(130);
+                }
+                return result;
             }
-            ProviderSetupResult::ManualKey(key) => {
-                tracing::info!("User entered API key manually");
-                save_opencode_config(&mut config, &key)?;
-            }
-            ProviderSetupResult::Skipped | ProviderSetupResult::Quit => {
-                anyhow::bail!("No AI provider configured. Run with --help for options.");
+            Err(_) => {
+                // Terminal init failed — fall back to standalone provider dialog
+                tracing::warn!(
+                    "Terminal init failed, falling back to standalone provider setup dialog"
+                );
+                run_standalone_provider_setup(&mut config).await?;
             }
         }
     }
 
+    // Normal TUI startup (or post-standalone-setup fallback)
     let provider = create_provider(&config, cli)?;
     let tools = coder::tool::ToolRegistry::default();
     let mut agent = coder::agent::Agent::new(provider, tools);
@@ -328,6 +351,49 @@ async fn run_tui_mode(mut config: coder::config::Settings, cli: &Cli) -> anyhow:
     }
 
     result
+}
+
+/// Standalone provider-setup dialog (terminal-less fallback).
+/// Called when terminal init fails on first run.
+async fn run_standalone_provider_setup(
+    config: &mut coder::config::Settings,
+) -> anyhow::Result<()> {
+    use coder::tui::dialog_provider_setup::{run_provider_setup_dialog, ProviderSetupResult};
+
+    let result = run_provider_setup_dialog();
+    match result {
+        ProviderSetupResult::FreeTier => {
+            tracing::info!("User selected OpenCode free tier (anonymous)");
+            save_opencode_config(config, "")?;
+        }
+        ProviderSetupResult::OAuth => {
+            tracing::info!("User selected OAuth flow");
+            #[cfg(feature = "ai-opencode")]
+            {
+                match coder::oauth::opencode::run_oauth_flow().await {
+                    coder::oauth::opencode::OAuthResultEnum::Success(key) => {
+                        save_opencode_config(config, &key)?;
+                    }
+                    coder::oauth::opencode::OAuthResultEnum::Cancelled => {
+                        anyhow::bail!("OAuth cancelled.");
+                    }
+                    coder::oauth::opencode::OAuthResultEnum::Error(e) => {
+                        anyhow::bail!("OAuth failed: {e}");
+                    }
+                }
+            }
+            #[cfg(not(feature = "ai-opencode"))]
+            anyhow::bail!("OAuth requires 'ai-opencode' feature");
+        }
+        ProviderSetupResult::ManualKey(key) => {
+            tracing::info!("User entered API key manually");
+            save_opencode_config(config, &key)?;
+        }
+        ProviderSetupResult::Skipped | ProviderSetupResult::Quit => {
+            anyhow::bail!("No AI provider configured. Run with --help for options.");
+        }
+    }
+    Ok(())
 }
 
 fn create_provider(

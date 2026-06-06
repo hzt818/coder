@@ -59,7 +59,6 @@
 | 模块 | 状态 | 说明 |
 |------|------|------|
 | [Sandbox](./sandbox.md) | 待完成 | 本地/远程沙箱执行后端 |
-| [i18n](./i18n.md) | 待完成 | 国际化框架、翻译系统 |
 | [Commands](./commands.md) | 待完成 | 用户自定义斜杠命令 |
 | [TUI](./tui.md) | 待完成 | 终端 UI 组件、Vim 模式、命令面板 |
 | [Context7](./context7.md) | 待完成 | Context7 MCP 集成 |

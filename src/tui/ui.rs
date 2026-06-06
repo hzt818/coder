@@ -5,6 +5,7 @@ use super::chat_panel;
 use super::detail_popup;
 use super::input;
 use super::mention_popup;
+use super::setup_wizard::{self, EditingField};
 use super::status_bar;
 use super::theme::AppTheme;
 use super::vim::Action;
@@ -92,6 +93,7 @@ pub async fn run_app(
                         AppMode::Streaming => handle_streaming_mode(app, key),
                         AppMode::Normal | AppMode::Detail => handle_normal_mode(app, key),
                         AppMode::Confirm { .. } => handle_confirm_mode(app, key),
+                        AppMode::Setup => handle_setup_mode(app, key),
                     };
                     match action {
                         InputAction::SendMessage(input) => {
@@ -164,9 +166,8 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
         ])
         .split(area);
 
-    let title = " 🦀 Coder".to_string();
     let title_span = Span::styled(
-        &title,
+        " 🦀 Coder",
         Style::default()
             .fg(theme.accent)
             .add_modifier(Modifier::BOLD),
@@ -240,6 +241,13 @@ fn render(frame: &mut Frame, app: &App, theme: &AppTheme) {
             app.detail_content.clone()
         };
         detail_popup::render_detail_popup(frame, area, &content, theme);
+    }
+
+    // Setup wizard overlay (rendered on top of everything)
+    if app.mode == AppMode::Setup {
+        if let Some(ref wizard) = app.wizard {
+            setup_wizard::render_setup_wizard(frame, area, wizard, theme);
+        }
     }
 }
 
@@ -365,7 +373,7 @@ fn render_welcome(frame: &mut Frame, area: Rect, app: &App, theme: &AppTheme) {
     } else {
         "Enter to send · @ mention · ! shell · / cmd"
     };
-    input::render_input(frame, input_area, app, hint, theme);
+    input::render_input(frame, input_area, app, &hint, theme);
     if matches!(app.input_submode, InputSubmode::Mention { .. }) {
         mention_popup::render_mention_popup(frame, input_area, &app.input_submode, theme);
     }
@@ -606,4 +614,272 @@ fn handle_confirm_mode(app: &mut App, key: crossterm::event::KeyEvent) -> InputA
         _ => {}
     }
     InputAction::None
+}
+
+/// Handle key events in setup wizard mode
+fn handle_setup_mode(app: &mut App, key: crossterm::event::KeyEvent) -> InputAction {
+    let wizard = match app.wizard.as_mut() {
+        Some(w) => w,
+        None => {
+            // Wizard state missing — drop back to Input
+            app.mode = AppMode::Input;
+            return InputAction::None;
+        }
+    };
+
+    // Exit confirmation overlay takes priority
+    if wizard.show_exit_confirm {
+        return match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => {
+                // Exit the wizard; keep the current wizard state for later /setup
+                wizard.show_exit_confirm = false;
+                app.mode = AppMode::Input;
+                app.status = "Setup wizard closed.".to_string();
+                app.mark_status_dirty();
+                InputAction::None
+            }
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                wizard.show_exit_confirm = false;
+                InputAction::None
+            }
+            _ => InputAction::None,
+        };
+    }
+
+    // Editing mode — text input
+    if wizard.editing != EditingField::None {
+        return match key.code {
+            KeyCode::Enter => {
+                wizard.commit_editing();
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.cancel_editing();
+                InputAction::None
+            }
+            KeyCode::Char(c) => {
+                wizard.editing_insert(c);
+                InputAction::None
+            }
+            KeyCode::Backspace => {
+                wizard.editing_backspace();
+                InputAction::None
+            }
+            KeyCode::Delete => {
+                wizard.editing_delete();
+                InputAction::None
+            }
+            KeyCode::Left => {
+                wizard.editing_left();
+                InputAction::None
+            }
+            KeyCode::Right => {
+                wizard.editing_right();
+                InputAction::None
+            }
+            KeyCode::Home => {
+                wizard.editing_home();
+                InputAction::None
+            }
+            KeyCode::End => {
+                wizard.editing_end();
+                InputAction::None
+            }
+            _ => InputAction::None,
+        };
+    }
+
+    // Step-specific key handling
+    match wizard.step {
+        super::setup_wizard::SetupStep::Welcome => match key.code {
+            KeyCode::Enter => {
+                wizard.next_step();
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.show_exit_confirm = true;
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::Provider => match key.code {
+            KeyCode::Enter => {
+                if let Some(err) = wizard.validate_step() {
+                    wizard.error = Some(err);
+                } else {
+                    wizard.next_step();
+                }
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            KeyCode::Up => {
+                wizard.select_prev();
+                InputAction::None
+            }
+            KeyCode::Down => {
+                wizard.select_next();
+                InputAction::None
+            }
+            KeyCode::Char('e') => {
+                wizard.start_editing(EditingField::ApiKey);
+                InputAction::None
+            }
+            KeyCode::Char('u') => {
+                wizard.start_editing(EditingField::BaseUrl);
+                InputAction::None
+            }
+            KeyCode::Char('m') => {
+                wizard.start_editing(EditingField::Model);
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::UiTheme => match key.code {
+            KeyCode::Enter => {
+                wizard.next_step();
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            KeyCode::Up => {
+                wizard.select_prev();
+                InputAction::None
+            }
+            KeyCode::Down => {
+                wizard.select_next();
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::UiPreferences => match key.code {
+            KeyCode::Enter => {
+                wizard.next_step();
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            KeyCode::Char('1') => {
+                wizard.toggle_bool("line_numbers");
+                InputAction::None
+            }
+            KeyCode::Char('2') => {
+                wizard.toggle_bool("syntax_highlight");
+                InputAction::None
+            }
+            KeyCode::Char('3') => {
+                wizard.toggle_bool("mouse_support");
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::ToolSettings => match key.code {
+            KeyCode::Enter => {
+                if let Some(err) = wizard.validate_step() {
+                    wizard.error = Some(err);
+                } else {
+                    wizard.next_step();
+                }
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            KeyCode::Char('1') => {
+                wizard.toggle_bool("confirm_before_exec");
+                InputAction::None
+            }
+            KeyCode::Char('e') => {
+                wizard.start_editing(EditingField::Timeout);
+                InputAction::None
+            }
+            KeyCode::Char('m') => {
+                wizard.start_editing(EditingField::MaxOutput);
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::SessionSettings => match key.code {
+            KeyCode::Enter => {
+                if let Some(err) = wizard.validate_step() {
+                    wizard.error = Some(err);
+                } else {
+                    wizard.next_step();
+                }
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            KeyCode::Char('e') => {
+                wizard.start_editing(EditingField::AutoSave);
+                InputAction::None
+            }
+            KeyCode::Char('m') => {
+                wizard.start_editing(EditingField::MaxMessages);
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::FeatureToggles => match key.code {
+            KeyCode::Enter => {
+                wizard.next_step();
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            KeyCode::Up => {
+                wizard.select_prev();
+                InputAction::None
+            }
+            KeyCode::Down => {
+                wizard.select_next();
+                InputAction::None
+            }
+            KeyCode::Char(' ') => {
+                wizard.toggle_feature();
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+
+        super::setup_wizard::SetupStep::Review => match key.code {
+            KeyCode::Enter => {
+                match wizard.save_config() {
+                    Ok(()) => {
+                        wizard.saved = true;
+                        app.mode = AppMode::Input;
+                        app.status = "Configuration saved! Welcome to Coder.".to_string();
+                        app.mark_status_dirty();
+                        // Keep wizard state for potential reconfiguration
+                    }
+                    Err(e) => {
+                        wizard.error = Some(e);
+                    }
+                }
+                InputAction::None
+            }
+            KeyCode::Esc => {
+                wizard.prev_step();
+                InputAction::None
+            }
+            _ => InputAction::None,
+        },
+    }
 }

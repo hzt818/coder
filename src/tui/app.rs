@@ -5,6 +5,7 @@ use crate::agent::Agent;
 use crate::agent::{InteractionMode, ReasoningEffort};
 use crate::session::manager::SessionManager;
 use crate::tui::help;
+use crate::tui::setup_wizard::SetupWizard;
 use crate::tui::vim::VimState;
 
 /// Application modes
@@ -20,6 +21,8 @@ pub enum AppMode {
     Detail,
     /// Confirm dialog
     Confirm { message: String },
+    /// Setup wizard (first-run onboarding or /setup command)
+    Setup,
 }
 
 /// Input sub-mode for special input handling
@@ -101,6 +104,8 @@ pub struct App {
     pub vim_state: VimState,
     /// Cached git branch name (computed once at construction)
     pub git_branch: Option<String>,
+    /// Setup wizard state (Some when mode is Setup or about to enter Setup)
+    pub wizard: Option<SetupWizard>,
 }
 
 /// A message rendered in the chat panel
@@ -158,6 +163,7 @@ impl App {
             mention_all_candidates,
             vim_state: VimState::new(),
             git_branch,
+            wizard: None,
         }
     }
 
@@ -853,6 +859,13 @@ impl App {
             "checkpoint" => {
                 let info = crate::core::checkpoint::format_checkpoint_info();
                 (true, Some(info))
+            }
+
+            // ── Setup wizard ──
+            "setup" => {
+                self.wizard = Some(SetupWizard::from_settings(&crate::config::Settings::load(None).unwrap_or_default()));
+                self.mode = AppMode::Setup;
+                (true, Some("Opening setup wizard...".to_string()))
             }
 
             // ── Mode commands ──

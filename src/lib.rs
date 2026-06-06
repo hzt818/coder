@@ -11,7 +11,6 @@ pub mod config;
 pub mod context;
 pub mod core;
 pub mod execpolicy;
-pub mod i18n;
 pub mod sandbox;
 pub mod session;
 pub mod tool;

@@ -68,7 +68,7 @@ pub fn render_input(frame: &mut Frame, area: Rect, app: &App, mode_hint: &str, t
 
     if display_input.is_empty() {
         spans.push(Span::styled(
-            "Type a message or /help for commands",
+            "Type a message...",
             Style::default()
                 .fg(theme.dim)
                 .add_modifier(Modifier::ITALIC),
@@ -168,7 +168,7 @@ fn build_hint_line<'a>(app: &App, mode_text: &'a str, theme: &AppTheme, width: u
                 spans.push(Span::styled("/cmd", Style::default().fg(theme.warning)));
                 spans.push(Span::styled("  ·  ", Style::default().fg(theme.dim)));
                 spans.push(Span::styled(
-                    "ctrl+o detail",
+                    "Ctrl+O for detail",
                     Style::default().fg(theme.dim),
                 ));
             } else {
@@ -202,6 +202,7 @@ fn build_hint_line<'a>(app: &App, mode_text: &'a str, theme: &AppTheme, width: u
         super::app::AppMode::Streaming => "streaming",
         super::app::AppMode::Detail => "detail",
         super::app::AppMode::Confirm { .. } => "confirm",
+        super::app::AppMode::Setup => "setup",
     };
 
     let right_text = format!(" {} ", mode_str);
